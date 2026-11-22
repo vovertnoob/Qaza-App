@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Calculator, Check, CheckCircle2, Info, Sparkles } from 'lucide-react';
+import { Calculator, Check, CheckCircle2, ChevronDown, Info, Sparkles } from 'lucide-react';
 import { PRAYERS, type PrayerType } from '../types/qaza';
 
 interface QazaCalculatorProps {
@@ -14,6 +14,97 @@ interface QazaCalculatorProps {
   onClose?: () => void;
 }
 
+interface AgeFieldProps {
+  id: string;
+  label: string;
+  valueText: string;
+  onChangeText: (next: string) => void;
+  min: number;
+  max: number;
+  fallback: number;
+  disabled?: boolean;
+  inputBgClass?: string;
+}
+
+const AgeField: React.FC<AgeFieldProps> = ({
+  id,
+  label,
+  valueText,
+  onChangeText,
+  min,
+  max,
+  fallback,
+  disabled = false,
+  inputBgClass = 'bg-[#F8F7F4] dark:bg-[#0E1311]',
+}) => {
+  const options = useMemo(() => {
+    const arr: number[] = [];
+    for (let a = min; a <= max; a += 1) arr.push(a);
+    return arr;
+  }, [min, max]);
+
+  const parsed = parseInt(valueText, 10);
+  const inOptions = !Number.isNaN(parsed) && parsed >= min && parsed <= max;
+
+  const handleBlur = () => {
+    if (valueText.trim() === '') {
+      onChangeText(String(Math.max(min, Math.min(max, fallback))));
+      return;
+    }
+    const n = parseInt(valueText, 10);
+    if (Number.isNaN(n)) {
+      onChangeText(String(Math.max(min, Math.min(max, fallback))));
+    } else {
+      onChangeText(String(Math.max(min, Math.min(max, n))));
+    }
+  };
+
+  return (
+    <div
+      className={`flex items-stretch rounded-xl border border-[#E5E2DC] dark:border-[#242E2A] ${inputBgClass} focus-within:ring-2 focus-within:ring-[#1B4D3E] overflow-hidden ${
+        disabled ? 'opacity-50' : ''
+      }`}
+    >
+      <input
+        id={id}
+        type="text"
+        inputMode="numeric"
+        pattern="[0-9]*"
+        disabled={disabled}
+        value={valueText}
+        placeholder={`${min}–${max}`}
+        onChange={(e) => {
+          const digitsOnly = e.target.value.replace(/\D/g, '').slice(0, 3);
+          onChangeText(digitsOnly);
+        }}
+        onBlur={handleBlur}
+        className="w-full min-w-0 min-h-[44px] px-3.5 bg-transparent font-mono-num text-sm focus:outline-none"
+      />
+      <div className="relative border-l border-[#E5E2DC] dark:border-[#242E2A] shrink-0 flex items-center">
+        <select
+          aria-label={`${label} dropdown`}
+          disabled={disabled}
+          value={inOptions ? String(parsed) : ''}
+          onChange={(e) => {
+            if (e.target.value) onChangeText(e.target.value);
+          }}
+          className="appearance-none bg-transparent pl-3 pr-7 min-h-[44px] text-xs font-medium text-[#5C635E] dark:text-[#9AA59E] cursor-pointer focus:outline-none"
+        >
+          <option value="" disabled>
+            Pick
+          </option>
+          {options.map((age) => (
+            <option key={age} value={String(age)}>
+              {age} yrs
+            </option>
+          ))}
+        </select>
+        <ChevronDown className="w-3.5 h-3.5 pointer-events-none absolute right-2 text-[#7A827D]" />
+      </div>
+    </div>
+  );
+};
+
 export const QazaCalculator: React.FC<QazaCalculatorProps> = ({
   mode,
   currentPendingTotal = 0,
@@ -22,13 +113,13 @@ export const QazaCalculator: React.FC<QazaCalculatorProps> = ({
   onClose,
 }) => {
   const [inputMode, setInputMode] = useState<'age' | 'duration'>('age');
-  const [currentAge, setCurrentAge] = useState<number>(28);
-  const [obligationAge, setObligationAge] = useState<number>(13);
-  const [startedPrayingRegularlyAge, setStartedPrayingRegularlyAge] = useState<number>(24);
+  const [currentAgeText, setCurrentAgeText] = useState<string>('28');
+  const [obligationAgeText, setObligationAgeText] = useState<string>('13');
+  const [startedRegularAgeText, setStartedRegularAgeText] = useState<string>('24');
   const [stillNotRegular, setStillNotRegular] = useState<boolean>(false);
 
-  const [durationYears, setDurationYears] = useState<number>(5);
-  const [durationMonths, setDurationMonths] = useState<number>(0);
+  const [durationYearsText, setDurationYearsText] = useState<string>('5');
+  const [durationMonthsText, setDurationMonthsText] = useState<string>('0');
 
   // Easy-to-understand prayer exemptions (no confusing percentage bar required)
   const [neverMissedJummah, setNeverMissedJummah] = useState<boolean>(false);
@@ -39,11 +130,21 @@ export const QazaCalculator: React.FC<QazaCalculatorProps> = ({
   const [showAdvanced, setShowAdvanced] = useState<boolean>(false);
   const [calendarBasis, setCalendarBasis] = useState<'solar' | 'lunar'>('solar');
   const [consistencyPct, setConsistencyPct] = useState<number>(0);
-  const [monthlyExemptDays, setMonthlyExemptDays] = useState<number>(0);
+  const [monthlyExemptDaysText, setMonthlyExemptDaysText] = useState<string>('0');
   const [cautionBufferPct, setCautionBufferPct] = useState<number>(0);
 
   const [applying, setApplying] = useState(false);
   const [appliedBanner, setAppliedBanner] = useState<string | null>(null);
+
+  const currentAge = Math.max(0, Math.min(110, parseInt(currentAgeText, 10) || 0));
+  const obligationAge = Math.max(0, Math.min(30, parseInt(obligationAgeText, 10) || 0));
+  const startedPrayingRegularlyAge = Math.max(
+    0,
+    Math.min(110, parseInt(startedRegularAgeText, 10) || 0)
+  );
+  const durationYears = Math.max(0, Math.min(80, parseInt(durationYearsText, 10) || 0));
+  const durationMonths = Math.max(0, Math.min(11, parseInt(durationMonthsText, 10) || 0));
+  const monthlyExemptDays = Math.max(0, Math.min(15, parseInt(monthlyExemptDaysText, 10) || 0));
 
   const calculation = useMemo(() => {
     const daysPerYear = calendarBasis === 'lunar' ? 354.37 : 365.25;
@@ -221,18 +322,20 @@ export const QazaCalculator: React.FC<QazaCalculatorProps> = ({
                   >
                     Your current age
                   </label>
-                  <input
+                  <AgeField
                     id="calc-current-age"
-                    type="number"
+                    label="Your current age"
+                    valueText={currentAgeText}
+                    onChangeText={(next) => {
+                      setCurrentAgeText(next);
+                      const parsedNext = parseInt(next, 10);
+                      if (!Number.isNaN(parsedNext) && parsedNext >= 7 && startedPrayingRegularlyAge > parsedNext) {
+                        setStartedRegularAgeText(String(parsedNext));
+                      }
+                    }}
                     min={7}
                     max={110}
-                    value={currentAge}
-                    onChange={(e) => {
-                      const val = Math.max(7, Math.min(110, parseInt(e.target.value, 10) || 7));
-                      setCurrentAge(val);
-                      if (startedPrayingRegularlyAge > val) setStartedPrayingRegularlyAge(val);
-                    }}
-                    className="w-full min-h-[44px] px-3.5 rounded-xl border border-[#E5E2DC] dark:border-[#242E2A] bg-[#F8F7F4] dark:bg-[#0E1311] font-mono-num text-sm"
+                    fallback={28}
                   />
                 </div>
 
@@ -243,16 +346,14 @@ export const QazaCalculator: React.FC<QazaCalculatorProps> = ({
                   >
                     Age prayers became obligatory
                   </label>
-                  <input
+                  <AgeField
                     id="calc-obligation-age"
-                    type="number"
+                    label="Age prayers became obligatory"
+                    valueText={obligationAgeText}
+                    onChangeText={setObligationAgeText}
                     min={7}
                     max={30}
-                    value={obligationAge}
-                    onChange={(e) =>
-                      setObligationAge(Math.max(7, Math.min(30, parseInt(e.target.value, 10) || 7)))
-                    }
-                    className="w-full min-h-[44px] px-3.5 rounded-xl border border-[#E5E2DC] dark:border-[#242E2A] bg-[#F8F7F4] dark:bg-[#0E1311] font-mono-num text-sm"
+                    fallback={13}
                   />
                   <p className="mt-1 text-[11px] text-[#7A827D]">
                     Often estimated around 12–15 depending on maturity.
@@ -275,23 +376,20 @@ export const QazaCalculator: React.FC<QazaCalculatorProps> = ({
                       onChange={(e) => setStillNotRegular(e.target.checked)}
                       className="w-4 h-4 accent-[#1B4D3E]"
                     />
-                    <span>Starting now (age {currentAge})</span>
+                    <span>Starting now (age {currentAge || 7})</span>
                   </label>
                 </div>
 
-                <input
+                <AgeField
                   id="calc-regular-age"
-                  type="number"
+                  label="Age you started praying regularly"
                   disabled={stillNotRegular}
-                  min={obligationAge}
-                  max={currentAge}
-                  value={stillNotRegular ? currentAge : startedPrayingRegularlyAge}
-                  onChange={(e) =>
-                    setStartedPrayingRegularlyAge(
-                      Math.max(0, Math.min(currentAge, parseInt(e.target.value, 10) || 0))
-                    )
-                  }
-                  className="w-full min-h-[44px] px-3.5 rounded-xl border border-[#E5E2DC] dark:border-[#242E2A] bg-white dark:bg-[#151C19] font-mono-num text-sm disabled:opacity-50"
+                  valueText={stillNotRegular ? String(currentAge || 7) : startedRegularAgeText}
+                  onChangeText={setStartedRegularAgeText}
+                  min={Math.max(7, obligationAge || 7)}
+                  max={Math.max(7, obligationAge || 7, currentAge || 7)}
+                  fallback={Math.min(currentAge || 24, Math.max(obligationAge || 13, 24))}
+                  inputBgClass="bg-white dark:bg-[#151C19]"
                 />
               </div>
             </div>
@@ -306,13 +404,20 @@ export const QazaCalculator: React.FC<QazaCalculatorProps> = ({
                 </label>
                 <input
                   id="calc-duration-years"
-                  type="number"
-                  min={0}
-                  max={80}
-                  value={durationYears}
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  value={durationYearsText}
+                  placeholder="0"
                   onChange={(e) =>
-                    setDurationYears(Math.max(0, Math.min(80, parseInt(e.target.value, 10) || 0)))
+                    setDurationYearsText(e.target.value.replace(/\D/g, '').slice(0, 2))
                   }
+                  onBlur={() => {
+                    const n = parseInt(durationYearsText, 10);
+                    setDurationYearsText(
+                      String(Number.isNaN(n) ? 0 : Math.max(0, Math.min(80, n)))
+                    );
+                  }}
                   className="w-full min-h-[44px] px-3.5 rounded-xl border border-[#E5E2DC] dark:border-[#242E2A] bg-[#F8F7F4] dark:bg-[#0E1311] font-mono-num text-sm"
                 />
               </div>
@@ -325,13 +430,20 @@ export const QazaCalculator: React.FC<QazaCalculatorProps> = ({
                 </label>
                 <input
                   id="calc-duration-months"
-                  type="number"
-                  min={0}
-                  max={11}
-                  value={durationMonths}
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  value={durationMonthsText}
+                  placeholder="0"
                   onChange={(e) =>
-                    setDurationMonths(Math.max(0, Math.min(11, parseInt(e.target.value, 10) || 0)))
+                    setDurationMonthsText(e.target.value.replace(/\D/g, '').slice(0, 2))
                   }
+                  onBlur={() => {
+                    const n = parseInt(durationMonthsText, 10);
+                    setDurationMonthsText(
+                      String(Number.isNaN(n) ? 0 : Math.max(0, Math.min(11, n)))
+                    );
+                  }}
                   className="w-full min-h-[44px] px-3.5 rounded-xl border border-[#E5E2DC] dark:border-[#242E2A] bg-[#F8F7F4] dark:bg-[#0E1311] font-mono-num text-sm"
                 />
               </div>
@@ -473,15 +585,20 @@ export const QazaCalculator: React.FC<QazaCalculatorProps> = ({
                     </label>
                     <input
                       id="calc-exempt-days"
-                      type="number"
-                      min={0}
-                      max={15}
-                      value={monthlyExemptDays}
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      value={monthlyExemptDaysText}
+                      placeholder="0"
                       onChange={(e) =>
-                        setMonthlyExemptDays(
-                          Math.max(0, Math.min(15, parseInt(e.target.value, 10) || 0))
-                        )
+                        setMonthlyExemptDaysText(e.target.value.replace(/\D/g, '').slice(0, 2))
                       }
+                      onBlur={() => {
+                        const n = parseInt(monthlyExemptDaysText, 10);
+                        setMonthlyExemptDaysText(
+                          String(Number.isNaN(n) ? 0 : Math.max(0, Math.min(15, n)))
+                        );
+                      }}
                       className="w-full min-h-[40px] px-3 rounded-xl border border-[#E5E2DC] dark:border-[#242E2A] bg-white dark:bg-[#151C19] font-mono-num text-xs"
                     />
                   </div>

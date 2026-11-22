@@ -34,7 +34,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onOpenAuth }
     '1_day' | '2_day' | '5_day' | '1_full_week' | 'custom' | 'skip'
   >('2_day');
   const [customTargetType, setCustomTargetType] = useState<TargetType>('daily');
-  const [customTargetCount, setCustomTargetCount] = useState<number>(3);
+  const [customTargetCountText, setCustomTargetCountText] = useState<string>('3');
   const [focusPrayer, setFocusPrayer] = useState<FocusPrayer>('fajr');
   const [showCalculator, setShowCalculator] = useState<boolean>(false);
 
@@ -60,8 +60,13 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onOpenAuth }
         return { targetType: 'daily', targetCount: 5 };
       case '1_full_week':
         return { targetType: 'weekly', targetCount: 5 };
-      case 'custom':
-        return { targetType: customTargetType, targetCount: Math.max(1, customTargetCount) };
+      case 'custom': {
+        const parsed = parseInt(customTargetCountText, 10);
+        return {
+          targetType: customTargetType,
+          targetCount: Math.max(1, Math.min(500, Number.isNaN(parsed) ? 1 : parsed)),
+        };
+      }
       case 'skip':
         return { targetType: 'none', targetCount: 0 };
     }
@@ -440,13 +445,20 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onOpenAuth }
               {targetPreset === 'custom' && (
                 <div className="p-4 rounded-xl bg-[#F8F7F4] dark:bg-[#0E1311] border border-[#E5E2DC] dark:border-[#242E2A] flex flex-wrap items-center gap-3">
                   <input
-                    type="number"
-                    min={1}
-                    max={500}
-                    value={customTargetCount}
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    value={customTargetCountText}
+                    placeholder="1"
                     onChange={(e) =>
-                      setCustomTargetCount(Math.max(1, Math.min(500, parseInt(e.target.value, 10) || 1)))
+                      setCustomTargetCountText(e.target.value.replace(/\D/g, '').slice(0, 3))
                     }
+                    onBlur={() => {
+                      const n = parseInt(customTargetCountText, 10);
+                      setCustomTargetCountText(
+                        String(Number.isNaN(n) ? 1 : Math.max(1, Math.min(500, n)))
+                      );
+                    }}
                     className="w-24 min-h-[42px] px-3 rounded-lg border border-[#E5E2DC] dark:border-[#242E2A] bg-white dark:bg-[#151C19] font-mono-num text-sm"
                   />
                   <span className="text-sm text-[#5C635E] dark:text-[#9AA59E]">prayers per</span>

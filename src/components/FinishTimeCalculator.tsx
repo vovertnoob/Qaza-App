@@ -87,31 +87,42 @@ export const FinishTimeCalculator: React.FC<FinishTimeCalculatorProps> = ({
         ? 'current'
         : 'custom'
   );
-  const [customBacklog, setCustomBacklog] = useState<number>(() =>
-    initialBacklogOverride && initialBacklogOverride > 0
-      ? initialBacklogOverride
-      : currentPendingTotal > 0
-        ? currentPendingTotal
-        : 5000
+  const [customBacklogText, setCustomBacklogText] = useState<string>(() =>
+    String(
+      initialBacklogOverride && initialBacklogOverride > 0
+        ? initialBacklogOverride
+        : currentPendingTotal > 0
+          ? currentPendingTotal
+          : 5000
+    )
   );
+  const customBacklog = Math.max(0, Math.min(200000, parseInt(customBacklogText, 10) || 0));
 
-  const [pacePerDay, setPacePerDay] = useState<number>(() =>
-    snapshot.profile.targetType === 'daily' && snapshot.profile.targetCount > 0
-      ? snapshot.profile.targetCount
-      : 5
+  const [paceText, setPaceText] = useState<string>(() =>
+    String(
+      snapshot.profile.targetType === 'daily' && snapshot.profile.targetCount > 0
+        ? snapshot.profile.targetCount
+        : 5
+    )
   );
+  const pacePerDay = Math.max(1, Math.min(100, parseInt(paceText, 10) || 1));
+  const setPacePerDay = (next: number | ((prev: number) => number)) => {
+    const resolved = typeof next === 'function' ? next(pacePerDay) : next;
+    setPaceText(String(Math.max(1, Math.min(100, resolved))));
+  };
+
   const [daysPerWeek, setDaysPerWeek] = useState<number>(7);
   const [goalSavedMsg, setGoalSavedMsg] = useState<string | null>(null);
 
   useEffect(() => {
     if (initialBacklogOverride && initialBacklogOverride > 0) {
       setBacklogSource('custom');
-      setCustomBacklog(initialBacklogOverride);
+      setCustomBacklogText(String(initialBacklogOverride));
     }
   }, [initialBacklogOverride]);
 
   const activeBacklog =
-    backlogSource === 'current' ? currentPendingTotal : Math.max(0, customBacklog);
+    backlogSource === 'current' ? currentPendingTotal : customBacklog;
 
   const computePlan = (backlog: number, dailyRate: number, activeDaysPerWeek: number) => {
     if (backlog <= 0) {
@@ -260,13 +271,20 @@ export const FinishTimeCalculator: React.FC<FinishTimeCalculatorProps> = ({
             ) : (
               <input
                 id="finish-backlog-input"
-                type="number"
-                min={0}
-                max={200000}
-                value={customBacklog}
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                value={customBacklogText}
+                placeholder="0"
                 onChange={(e) =>
-                  setCustomBacklog(Math.max(0, Math.min(200000, parseInt(e.target.value, 10) || 0)))
+                  setCustomBacklogText(e.target.value.replace(/\D/g, '').slice(0, 6))
                 }
+                onBlur={() => {
+                  const n = parseInt(customBacklogText, 10);
+                  setCustomBacklogText(
+                    String(Number.isNaN(n) ? 0 : Math.max(0, Math.min(200000, n)))
+                  );
+                }}
                 className="w-full min-h-[44px] px-3.5 rounded-xl border border-[#E5E2DC] dark:border-[#242E2A] bg-white dark:bg-[#151C19] font-mono-num text-base font-medium"
               />
             )}
@@ -301,13 +319,18 @@ export const FinishTimeCalculator: React.FC<FinishTimeCalculatorProps> = ({
               </button>
               <input
                 id="finish-daily-pace"
-                type="number"
-                min={1}
-                max={100}
-                value={pacePerDay}
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                value={paceText}
+                placeholder="1"
                 onChange={(e) =>
-                  setPacePerDay(Math.max(1, Math.min(100, parseInt(e.target.value, 10) || 1)))
+                  setPaceText(e.target.value.replace(/\D/g, '').slice(0, 3))
                 }
+                onBlur={() => {
+                  const n = parseInt(paceText, 10);
+                  setPaceText(String(Number.isNaN(n) ? 1 : Math.max(1, Math.min(100, n))));
+                }}
                 className="flex-1 min-h-[44px] px-4 rounded-xl border border-[#E5E2DC] dark:border-[#242E2A] bg-[#F8F7F4] dark:bg-[#0E1311] text-center font-mono-num text-lg font-semibold"
               />
               <button

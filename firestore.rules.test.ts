@@ -1,0 +1,108 @@
+/**
+ * Adversarial Security Test Specification ("Dirty Dozen") for QazaFlow Firestore Rules.
+ * Run against Firebase Emulator Suite when available:
+ *   npx firebase emulators:exec --only firestore "npx tsx firestore.rules.test.ts"
+ */
+export const dirtyDozenPayloads = [
+  {
+    name: '1. Cross-tenant profile read',
+    actor: 'userB',
+    path: 'users/userA',
+    op: 'get',
+    expected: 'PERMISSION_DENIED',
+  },
+  {
+    name: '2. Cross-tenant balance write',
+    actor: 'userB',
+    path: 'users/userA/balances/fajr',
+    op: 'set',
+    payload: {
+      userId: 'userA',
+      prayerType: 'fajr',
+      initialBalance: 100,
+      pendingBalance: 90,
+      completedBalance: 10,
+      inboxPendingCount: 0,
+    },
+    expected: 'PERMISSION_DENIED',
+  },
+  {
+    name: '3. Shadow field injection on profile create',
+    actor: 'userA',
+    path: 'users/userA',
+    op: 'set',
+    payload: { uid: 'userA', isAdmin: true },
+    expected: 'PERMISSION_DENIED',
+  },
+  {
+    name: '4. Negative balance injection',
+    actor: 'userA',
+    path: 'users/userA/balances/fajr',
+    op: 'update',
+    payload: { pendingBalance: -5 },
+    expected: 'PERMISSION_DENIED',
+  },
+  {
+    name: '5. Invalid prayer key path',
+    actor: 'userA',
+    path: 'users/userA/balances/witr',
+    op: 'set',
+    payload: { userId: 'userA', prayerType: 'witr' },
+    expected: 'PERMISSION_DENIED',
+  },
+  {
+    name: '6. Owner UID spoofing in subcollection',
+    actor: 'userA',
+    path: 'users/userA/qazaEntries/entry_1',
+    op: 'set',
+    payload: { id: 'entry_1', userId: 'userB', prayerType: 'fajr', status: 'pending' },
+    expected: 'PERMISSION_DENIED',
+  },
+  {
+    name: '7. Oversized ID / Denial-of-Wallet poisoning',
+    actor: 'userA',
+    path: `users/userA/qazaEntries/${'x'.repeat(300)}`,
+    op: 'set',
+    payload: { id: 'x'.repeat(300), userId: 'userA', prayerType: 'fajr', status: 'pending' },
+    expected: 'PERMISSION_DENIED',
+  },
+  {
+    name: '8. Client-forged createdAt timestamp',
+    actor: 'userA',
+    path: 'users/userA/activityLogs/log_1',
+    op: 'set',
+    payload: { id: 'log_1', userId: 'userA', createdAt: new Date('2020-01-01T00:00:00Z') },
+    expected: 'PERMISSION_DENIED',
+  },
+  {
+    name: '9. Immutable field tampering on activityLogs',
+    actor: 'userA',
+    path: 'users/userA/activityLogs/log_1',
+    op: 'update',
+    payload: { quantity: 999 },
+    expected: 'PERMISSION_DENIED',
+  },
+  {
+    name: '10. Terminal state bypass on completed QazaEntry',
+    actor: 'userA',
+    path: 'users/userA/qazaEntries/entry_completed',
+    op: 'update',
+    payload: { status: 'pending' },
+    expected: 'PERMISSION_DENIED',
+  },
+  {
+    name: '11. Unbounded array injection on reminderAfterPrayers',
+    actor: 'userA',
+    path: 'users/userA',
+    op: 'update',
+    payload: { reminderAfterPrayers: Array(25).fill('fajr') },
+    expected: 'PERMISSION_DENIED',
+  },
+  {
+    name: '12. Unauthenticated list/read',
+    actor: null,
+    path: 'users/userA/activityLogs',
+    op: 'list',
+    expected: 'PERMISSION_DENIED',
+  },
+];

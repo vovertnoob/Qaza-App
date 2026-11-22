@@ -1,0 +1,412 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Authenticated user account preferences, tracking routine, targets, and reminder configuration.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "email": {
+          "type": "string",
+          "maxLength": 254
+        },
+        "displayName": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "onboardingCompleted": {
+          "type": "boolean"
+        },
+        "routine": {
+          "type": "string",
+          "enum": [
+            "after_each_prayer",
+            "full_qaza_day",
+            "one_prayer_at_a_time",
+            "custom_daily",
+            "custom_weekly"
+          ]
+        },
+        "targetType": {
+          "type": "string",
+          "enum": ["daily", "weekly", "none"]
+        },
+        "targetCount": {
+          "type": "integer"
+        },
+        "focusPrayer": {
+          "type": "string",
+          "enum": ["fajr", "dhuhr", "asr", "maghrib", "isha", "none"]
+        },
+        "startSmallMode": {
+          "type": "boolean"
+        },
+        "autoCarryForward": {
+          "type": "boolean"
+        },
+        "dailyCheckInEnabled": {
+          "type": "boolean"
+        },
+        "remindersEnabled": {
+          "type": "boolean"
+        },
+        "reminderTime": {
+          "type": "string",
+          "maxLength": 10
+        },
+        "reminderAfterPrayers": {
+          "type": "array",
+          "description": "Prayers after which to trigger gentle reminders (max 5)."
+        },
+        "theme": {
+          "type": "string",
+          "enum": ["light", "dark", "system"]
+        },
+        "lastBackupAt": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "lastSyncAt": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "syncVersion": {
+          "type": "integer"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "uid",
+        "email",
+        "displayName",
+        "onboardingCompleted",
+        "routine",
+        "targetType",
+        "targetCount",
+        "focusPrayer",
+        "startSmallMode",
+        "autoCarryForward",
+        "dailyCheckInEnabled",
+        "remindersEnabled",
+        "reminderTime",
+        "reminderAfterPrayers",
+        "theme",
+        "syncVersion",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "PrayerBalance": {
+      "title": "PrayerBalance",
+      "description": "Individual prayer category balance for Fajr, Dhuhr, Asr, Maghrib, or Isha.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "prayerType": {
+          "type": "string",
+          "enum": ["fajr", "dhuhr", "asr", "maghrib", "isha"]
+        },
+        "initialBalance": {
+          "type": "integer"
+        },
+        "pendingBalance": {
+          "type": "integer"
+        },
+        "completedBalance": {
+          "type": "integer"
+        },
+        "inboxPendingCount": {
+          "type": "integer"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "userId",
+        "prayerType",
+        "initialBalance",
+        "pendingBalance",
+        "completedBalance",
+        "inboxPendingCount",
+        "updatedAt"
+      ]
+    },
+    "QazaEntry": {
+      "title": "QazaEntry",
+      "description": "Newly missed prayer entry in the Qaza Inbox queue.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "userId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "prayerType": {
+          "type": "string",
+          "enum": ["fajr", "dhuhr", "asr", "maghrib", "isha"]
+        },
+        "source": {
+          "type": "string",
+          "enum": ["manual_inbox", "daily_checkin"]
+        },
+        "status": {
+          "type": "string",
+          "enum": ["pending", "completed", "removed"]
+        },
+        "note": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "dateAdded": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "completedAt": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "prayerType",
+        "source",
+        "status",
+        "dateAdded",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "ActivityLog": {
+      "title": "ActivityLog",
+      "description": "Immutable chronological audit trail entry for Qaza balance mutations.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "userId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "actionType": {
+          "type": "string",
+          "enum": [
+            "completed",
+            "missed_added",
+            "balance_adjusted",
+            "batch_completed",
+            "inbox_completed",
+            "undone",
+            "restored"
+          ]
+        },
+        "prayerType": {
+          "type": "string",
+          "enum": ["fajr", "dhuhr", "asr", "maghrib", "isha", "all"]
+        },
+        "quantity": {
+          "type": "integer"
+        },
+        "previousPending": {
+          "type": "integer"
+        },
+        "updatedPending": {
+          "type": "integer"
+        },
+        "previousCompleted": {
+          "type": "integer"
+        },
+        "updatedCompleted": {
+          "type": "integer"
+        },
+        "note": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "clientTimestamp": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "undoneByLogId": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "actionType",
+        "prayerType",
+        "quantity",
+        "previousPending",
+        "updatedPending",
+        "previousCompleted",
+        "updatedCompleted",
+        "clientTimestamp",
+        "createdAt"
+      ]
+    },
+    "DailyCheckIn": {
+      "title": "DailyCheckIn",
+      "description": "Optional daily five-prayer check-in state for carrying forward missed prayers.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "date": {
+          "type": "string",
+          "maxLength": 10,
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "fajr": {
+          "type": "string",
+          "enum": ["prayed", "missed", "unmarked"]
+        },
+        "dhuhr": {
+          "type": "string",
+          "enum": ["prayed", "missed", "unmarked"]
+        },
+        "asr": {
+          "type": "string",
+          "enum": ["prayed", "missed", "unmarked"]
+        },
+        "maghrib": {
+          "type": "string",
+          "enum": ["prayed", "missed", "unmarked"]
+        },
+        "isha": {
+          "type": "string",
+          "enum": ["prayed", "missed", "unmarked"]
+        },
+        "carriedForwardPrayers": {
+          "type": "array",
+          "description": "List of prayer keys already carried forward to Qaza Inbox."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "userId",
+        "date",
+        "fajr",
+        "dhuhr",
+        "asr",
+        "maghrib",
+        "isha",
+        "carriedForwardPrayers",
+        "updatedAt"
+      ]
+    },
+    "SyncMetadata": {
+      "title": "SyncMetadata",
+      "description": "Tracks backup timestamps and conflict-prevention version metadata.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "lastBackupAt": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "lastSyncAt": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "version": {
+          "type": "integer"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "userId",
+        "lastBackupAt",
+        "lastSyncAt",
+        "version",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Private user profile and tracking preferences."
+    },
+    "/users/{userId}/balances/{prayerType}": {
+      "schema": { "$ref": "#/entities/PrayerBalance" },
+      "description": "Individual prayer balance documents (fajr, dhuhr, asr, maghrib, isha)."
+    },
+    "/users/{userId}/qazaEntries/{entryId}": {
+      "schema": { "$ref": "#/entities/QazaEntry" },
+      "description": "Newly missed prayer queue (Qaza Inbox)."
+    },
+    "/users/{userId}/activityLogs/{logId}": {
+      "schema": { "$ref": "#/entities/ActivityLog" },
+      "description": "Chronological Qaza tracking audit trail."
+    },
+    "/users/{userId}/dailyCheckIns/{dateKey}": {
+      "schema": { "$ref": "#/entities/DailyCheckIn" },
+      "description": "Optional daily five-prayer check-ins."
+    },
+    "/users/{userId}/syncMetadata/{docId}": {
+      "schema": { "$ref": "#/entities/SyncMetadata" },
+      "description": "Sync and backup state metadata."
+    }
+  }
+}

@@ -1,0 +1,318 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global Safety Net (Default Deny)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Global Helpers ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isValidPrayerType(p) {
+      return p in ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha'];
+    }
+
+    function isValidCheckInStatus(s) {
+      return s in ['prayed', 'missed', 'unmarked'];
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // --- Validation Blueprints ---
+    function isValidUserProfile(data, userId) {
+      return data.keys().hasAll([
+          'uid', 'email', 'displayName', 'onboardingCompleted', 'routine',
+          'targetType', 'targetCount', 'focusPrayer', 'startSmallMode',
+          'autoCarryForward', 'dailyCheckInEnabled', 'remindersEnabled',
+          'reminderTime', 'reminderAfterPrayers', 'theme', 'syncVersion',
+          'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'uid', 'email', 'displayName', 'onboardingCompleted', 'routine',
+          'targetType', 'targetCount', 'focusPrayer', 'startSmallMode',
+          'autoCarryForward', 'dailyCheckInEnabled', 'remindersEnabled',
+          'reminderTime', 'reminderAfterPrayers', 'theme', 'lastBackupAt',
+          'lastSyncAt', 'syncVersion', 'createdAt', 'updatedAt'
+        ])
+        && data.uid is string && data.uid == userId && data.uid == request.auth.uid
+        && data.email is string && data.email.size() <= 254
+        && data.displayName is string && data.displayName.size() <= 100
+        && data.onboardingCompleted is bool
+        && data.routine in ['after_each_prayer', 'full_qaza_day', 'one_prayer_at_a_time', 'custom_daily', 'custom_weekly']
+        && data.targetType in ['daily', 'weekly', 'none']
+        && data.targetCount is int && data.targetCount >= 0 && data.targetCount <= 500
+        && data.focusPrayer in ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha', 'none']
+        && data.startSmallMode is bool
+        && data.autoCarryForward is bool
+        && data.dailyCheckInEnabled is bool
+        && data.remindersEnabled is bool
+        && data.reminderTime is string && data.reminderTime.size() <= 10
+        && data.reminderAfterPrayers is list && data.reminderAfterPrayers.size() <= 5
+        && (data.reminderAfterPrayers.size() == 0 || data.reminderAfterPrayers[0] is string)
+        && data.theme in ['light', 'dark', 'system']
+        && (!('lastBackupAt' in data) || (data.lastBackupAt is string && data.lastBackupAt.size() <= 40))
+        && (!('lastSyncAt' in data) || (data.lastSyncAt is string && data.lastSyncAt.size() <= 40))
+        && data.syncVersion is int && data.syncVersion >= 0
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidPrayerBalance(data, userId, prayerType) {
+      return data.keys().hasAll([
+          'userId', 'prayerType', 'initialBalance', 'pendingBalance',
+          'completedBalance', 'inboxPendingCount', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'userId', 'prayerType', 'initialBalance', 'pendingBalance',
+          'completedBalance', 'inboxPendingCount', 'updatedAt'
+        ])
+        && data.userId is string && data.userId == userId && data.userId == request.auth.uid
+        && data.prayerType is string && data.prayerType == prayerType && isValidPrayerType(data.prayerType)
+        && data.initialBalance is int && data.initialBalance >= 0 && data.initialBalance <= 1000000
+        && data.pendingBalance is int && data.pendingBalance >= 0 && data.pendingBalance <= 1000000
+        && data.completedBalance is int && data.completedBalance >= 0 && data.completedBalance <= 1000000
+        && data.inboxPendingCount is int && data.inboxPendingCount >= 0 && data.inboxPendingCount <= 1000000
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidQazaEntry(data, userId, entryId) {
+      return data.keys().hasAll([
+          'id', 'userId', 'prayerType', 'source', 'status',
+          'dateAdded', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'id', 'userId', 'prayerType', 'source', 'status',
+          'note', 'dateAdded', 'completedAt', 'createdAt', 'updatedAt'
+        ])
+        && data.id is string && data.id == entryId
+        && data.userId is string && data.userId == userId && data.userId == request.auth.uid
+        && isValidPrayerType(data.prayerType)
+        && data.source in ['manual_inbox', 'daily_checkin']
+        && data.status in ['pending', 'completed', 'removed']
+        && (!('note' in data) || (data.note is string && data.note.size() <= 200))
+        && data.dateAdded is string && data.dateAdded.size() <= 40
+        && (!('completedAt' in data) || (data.completedAt is string && data.completedAt.size() <= 40))
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidActivityLog(data, userId, logId) {
+      return data.keys().hasAll([
+          'id', 'userId', 'actionType', 'prayerType', 'quantity',
+          'previousPending', 'updatedPending', 'previousCompleted',
+          'updatedCompleted', 'clientTimestamp', 'createdAt'
+        ])
+        && data.keys().hasOnly([
+          'id', 'userId', 'actionType', 'prayerType', 'quantity',
+          'previousPending', 'updatedPending', 'previousCompleted',
+          'updatedCompleted', 'note', 'clientTimestamp', 'undoneByLogId', 'createdAt'
+        ])
+        && data.id is string && data.id == logId
+        && data.userId is string && data.userId == userId && data.userId == request.auth.uid
+        && data.actionType in ['completed', 'missed_added', 'balance_adjusted', 'batch_completed', 'inbox_completed', 'undone', 'restored']
+        && data.prayerType in ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha', 'all']
+        && data.quantity is int && data.quantity >= 0 && data.quantity <= 1000000
+        && data.previousPending is int && data.previousPending >= 0 && data.previousPending <= 5000000
+        && data.updatedPending is int && data.updatedPending >= 0 && data.updatedPending <= 5000000
+        && data.previousCompleted is int && data.previousCompleted >= 0 && data.previousCompleted <= 5000000
+        && data.updatedCompleted is int && data.updatedCompleted >= 0 && data.updatedCompleted <= 5000000
+        && (!('note' in data) || (data.note is string && data.note.size() <= 200))
+        && data.clientTimestamp is string && data.clientTimestamp.size() <= 40
+        && (!('undoneByLogId' in data) || (data.undoneByLogId is string && data.undoneByLogId.size() <= 128))
+        && data.createdAt is timestamp;
+    }
+
+    function isValidDailyCheckIn(data, userId, dateKey) {
+      return data.keys().hasAll([
+          'userId', 'date', 'fajr', 'dhuhr', 'asr', 'maghrib', 'isha',
+          'carriedForwardPrayers', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'userId', 'date', 'fajr', 'dhuhr', 'asr', 'maghrib', 'isha',
+          'carriedForwardPrayers', 'updatedAt'
+        ])
+        && data.userId is string && data.userId == userId && data.userId == request.auth.uid
+        && data.date is string && data.date == dateKey && data.date.matches('^\\d{4}-\\d{2}-\\d{2}$')
+        && isValidCheckInStatus(data.fajr)
+        && isValidCheckInStatus(data.dhuhr)
+        && isValidCheckInStatus(data.asr)
+        && isValidCheckInStatus(data.maghrib)
+        && isValidCheckInStatus(data.isha)
+        && data.carriedForwardPrayers is list && data.carriedForwardPrayers.size() <= 5
+        && (data.carriedForwardPrayers.size() == 0 || data.carriedForwardPrayers[0] is string)
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidSyncMetadata(data, userId) {
+      return data.keys().hasAll([
+          'userId', 'lastBackupAt', 'lastSyncAt', 'version', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'userId', 'lastBackupAt', 'lastSyncAt', 'version', 'updatedAt'
+        ])
+        && data.userId is string && data.userId == userId && data.userId == request.auth.uid
+        && data.lastBackupAt is string && data.lastBackupAt.size() <= 40
+        && data.lastSyncAt is string && data.lastSyncAt.size() <= 40
+        && data.version is int && data.version >= 0
+        && data.updatedAt is timestamp;
+    }
+
+    // --- Collection Rules ---
+    match /users/{userId} {
+      allow get: if isOwner(userId) && isValidId(userId);
+      allow list: if false;
+      allow create: if isOwner(userId)
+        && isValidId(userId)
+        && isValidUserProfile(incoming(), userId)
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isOwner(userId)
+        && isValidId(userId)
+        && isValidUserProfile(incoming(), userId)
+        && incoming().uid == existing().uid
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly([
+          'email', 'displayName', 'onboardingCompleted', 'routine',
+          'targetType', 'targetCount', 'focusPrayer', 'startSmallMode',
+          'autoCarryForward', 'dailyCheckInEnabled', 'remindersEnabled',
+          'reminderTime', 'reminderAfterPrayers', 'theme',
+          'lastBackupAt', 'lastSyncAt', 'syncVersion', 'updatedAt'
+        ]);
+      allow delete: if isOwner(userId) && isValidId(userId);
+
+      // Prayer Balances (5 categories)
+      match /balances/{prayerType} {
+        allow get: if isOwner(userId) && isValidId(userId) && isValidPrayerType(prayerType);
+        allow list: if isOwner(userId) && resource.data.userId == request.auth.uid;
+        allow create: if isOwner(userId)
+          && isValidId(userId)
+          && isValidPrayerType(prayerType)
+          && isValidPrayerBalance(incoming(), userId, prayerType)
+          && incoming().updatedAt == request.time;
+        allow update: if isOwner(userId)
+          && isValidId(userId)
+          && isValidPrayerType(prayerType)
+          && isValidPrayerBalance(incoming(), userId, prayerType)
+          && incoming().userId == existing().userId
+          && incoming().prayerType == existing().prayerType
+          && incoming().updatedAt == request.time
+          && incoming().diff(existing()).affectedKeys().hasOnly([
+            'initialBalance', 'pendingBalance', 'completedBalance',
+            'inboxPendingCount', 'updatedAt'
+          ]);
+        allow delete: if isOwner(userId) && isValidId(userId) && isValidPrayerType(prayerType);
+      }
+
+      // Qaza Inbox Entries
+      match /qazaEntries/{entryId} {
+        allow get: if isOwner(userId) && isValidId(userId) && isValidId(entryId);
+        allow list: if isOwner(userId) && resource.data.userId == request.auth.uid;
+        allow create: if isOwner(userId)
+          && isValidId(userId)
+          && isValidId(entryId)
+          && isValidQazaEntry(incoming(), userId, entryId)
+          && incoming().status == 'pending'
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time;
+        allow update: if isOwner(userId)
+          && isValidId(userId)
+          && isValidId(entryId)
+          && isValidQazaEntry(incoming(), userId, entryId)
+          && existing().status == 'pending'
+          && incoming().id == existing().id
+          && incoming().userId == existing().userId
+          && incoming().prayerType == existing().prayerType
+          && incoming().source == existing().source
+          && incoming().dateAdded == existing().dateAdded
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && (
+            (incoming().status in ['completed', 'removed'] && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'completedAt', 'updatedAt'])) ||
+            (incoming().status == 'pending' && incoming().diff(existing()).affectedKeys().hasOnly(['note', 'updatedAt']))
+          );
+        allow delete: if isOwner(userId) && isValidId(userId) && isValidId(entryId);
+      }
+
+      // Activity Logs (Chronological Audit Trail)
+      match /activityLogs/{logId} {
+        allow get: if isOwner(userId) && isValidId(userId) && isValidId(logId);
+        allow list: if isOwner(userId) && resource.data.userId == request.auth.uid;
+        allow create: if isOwner(userId)
+          && isValidId(userId)
+          && isValidId(logId)
+          && isValidActivityLog(incoming(), userId, logId)
+          && incoming().createdAt == request.time;
+        allow update: if isOwner(userId)
+          && isValidId(userId)
+          && isValidId(logId)
+          && isValidActivityLog(incoming(), userId, logId)
+          && !('undoneByLogId' in existing())
+          && incoming().undoneByLogId.size() >= 1
+          && incoming().diff(existing()).affectedKeys().hasOnly(['undoneByLogId']);
+        allow delete: if isOwner(userId) && isValidId(userId) && isValidId(logId);
+      }
+
+      // Daily Salah Check-Ins
+      match /dailyCheckIns/{dateKey} {
+        allow get: if isOwner(userId) && isValidId(userId) && isValidId(dateKey);
+        allow list: if isOwner(userId) && resource.data.userId == request.auth.uid;
+        allow create: if isOwner(userId)
+          && isValidId(userId)
+          && isValidId(dateKey)
+          && isValidDailyCheckIn(incoming(), userId, dateKey)
+          && incoming().updatedAt == request.time;
+        allow update: if isOwner(userId)
+          && isValidId(userId)
+          && isValidId(dateKey)
+          && isValidDailyCheckIn(incoming(), userId, dateKey)
+          && incoming().userId == existing().userId
+          && incoming().date == existing().date
+          && incoming().updatedAt == request.time
+          && incoming().diff(existing()).affectedKeys().hasOnly([
+            'fajr', 'dhuhr', 'asr', 'maghrib', 'isha',
+            'carriedForwardPrayers', 'updatedAt'
+          ]);
+        allow delete: if isOwner(userId) && isValidId(userId) && isValidId(dateKey);
+      }
+
+      // Sync Metadata
+      match /syncMetadata/{docId} {
+        allow get: if isOwner(userId) && isValidId(userId) && docId == 'state';
+        allow list: if isOwner(userId) && resource.data.userId == request.auth.uid;
+        allow create: if isOwner(userId)
+          && isValidId(userId)
+          && docId == 'state'
+          && isValidSyncMetadata(incoming(), userId)
+          && incoming().updatedAt == request.time;
+        allow update: if isOwner(userId)
+          && isValidId(userId)
+          && docId == 'state'
+          && isValidSyncMetadata(incoming(), userId)
+          && incoming().userId == existing().userId
+          && incoming().updatedAt == request.time
+          && incoming().diff(existing()).affectedKeys().hasOnly([
+            'lastBackupAt', 'lastSyncAt', 'version', 'updatedAt'
+          ]);
+        allow delete: if isOwner(userId) && isValidId(userId) && docId == 'state';
+      }
+    }
+  }
+}

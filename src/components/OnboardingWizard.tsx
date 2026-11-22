@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { ArrowLeft, ArrowRight, Calculator, Check, Cloud } from 'lucide-react';
 import { useQaza } from '../context/QazaContext';
 import { QazaCalculator } from './QazaCalculator';
+import { PWAInstallButton } from './PWAInstallButton';
 import {
   PRAYERS,
   ROUTINE_OPTIONS,
@@ -88,24 +89,28 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onOpenAuth }
   return (
     <div className="min-h-screen bg-[#F8F7F4] dark:bg-[#0E1311] text-[#1A1D1B] dark:text-[#F1F3F2] flex flex-col">
       <header className="w-full border-b border-[#E5E2DC] dark:border-[#242E2A] bg-white/80 dark:bg-[#151C19]/80 backdrop-blur-md">
-        <div className="max-w-3xl mx-auto px-5 h-16 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-2.5">
+        <div className="max-w-3xl mx-auto px-4 sm:px-5 h-16 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 shrink-0">
             <img src="/icon.svg" alt="" className="w-7 h-7 rounded-lg" />
             <span className="font-display font-semibold text-base tracking-tight">QazaFlow</span>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+            <PWAInstallButton compact />
             {!user && (
               <button
                 type="button"
                 onClick={onOpenAuth}
-                className="inline-flex items-center gap-1.5 min-h-[40px] px-3 rounded-xl border border-[#E5E2DC] dark:border-[#242E2A] text-xs font-medium text-[#1A1D1B] dark:text-[#F1F3F2] hover:bg-[#F1EFE9] dark:hover:bg-[#1D2622] transition-colors whitespace-nowrap shrink-0"
+                className="inline-flex items-center gap-1.5 min-h-[40px] px-2.5 sm:px-3 rounded-xl border border-[#E5E2DC] dark:border-[#242E2A] text-xs font-medium text-[#1A1D1B] dark:text-[#F1F3F2] hover:bg-[#F1EFE9] dark:hover:bg-[#1D2622] transition-colors whitespace-nowrap shrink-0"
               >
                 <Cloud className="w-3.5 h-3.5 text-[#1B4D3E] dark:text-[#7FD1B2]" />
                 <span>Sign In</span>
               </button>
             )}
             <span className="text-xs font-mono-num text-[#5C635E] dark:text-[#9AA59E] whitespace-nowrap">
-              Step {step} of 5
+              <span className="hidden sm:inline">Step </span>
+              {step}
+              <span className="hidden sm:inline"> of 5</span>
+              <span className="sm:hidden">/5</span>
             </span>
           </div>
         </div>

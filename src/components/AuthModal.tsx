@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { X, Mail, Lock, User as UserIcon, ArrowRight, CheckCircle2 } from 'lucide-react';
+import { useLanguage } from '../context/LanguageContext';
 import { useQaza } from '../context/QazaContext';
 
 interface AuthModalProps {
@@ -14,6 +15,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   initialMode = 'login',
 }) => {
   const { signInWithGoogle, signInWithEmail, signUpWithEmail, resetPassword } = useQaza();
+  const { tr } = useLanguage();
   const [mode, setMode] = useState<'login' | 'signup' | 'reset'>(initialMode);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -27,19 +29,28 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const formatAuthError = (err: unknown): string => {
     const msg = err instanceof Error ? err.message : String(err);
     if (msg.includes('auth/operation-not-allowed')) {
-      return 'Email/Password sign-in is not yet enabled in Firebase Console (Authentication → Sign-in method → Email/Password). You can sign in with Google right away, or enable Email/Password in Firebase Console.';
+      return tr(
+        'Email/Password sign-in is not yet enabled in Firebase Console. You can sign in with Google right away.',
+        'ईमेल/पासवर्ड अभी सक्षम नहीं है। आप सीधे Google से साइन इन कर सकते हैं।'
+      );
     }
     if (msg.includes('auth/invalid-credential') || msg.includes('auth/wrong-password')) {
-      return 'Incorrect email or password. Please check your credentials and try again.';
+      return tr(
+        'Incorrect email or password. Please check your credentials and try again.',
+        'ईमेल या पासवर्ड ग़लत है। कृपया दोबारा जांचें।'
+      );
     }
     if (msg.includes('auth/email-already-in-use')) {
-      return 'An account with this email already exists. Try signing in instead.';
+      return tr(
+        'An account with this email already exists. Try signing in instead.',
+        'इस ईमेल से खाता पहले से मौजूद है। साइन इन करें।'
+      );
     }
     if (msg.includes('auth/weak-password')) {
-      return 'Please choose a password with at least 6 characters.';
+      return tr('Please choose a password with at least 6 characters.', 'कम से कम 6 अक्षरों का पासवर्ड चुनें।');
     }
     if (msg.includes('auth/popup-closed-by-user')) {
-      return 'Sign-in window was closed before completing.';
+      return tr('Sign-in window was closed before completing.', 'साइन-इन पूरा होने से पहले विंडो बंद हो गई।');
     }
     return msg;
   };
@@ -58,7 +69,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         onClose();
       } else {
         await resetPassword(email);
-        setInfoMsg('Password reset instructions have been sent to your email.');
+        setInfoMsg(
+          tr(
+            'Password reset instructions have been sent to your email.',
+            'पासवर्ड रीसेट लिंक आपके ईमेल पर भेज दिया गया है।'
+          )
+        );
       }
     } catch (err) {
       setErrorMsg(formatAuthError(err));
@@ -96,20 +112,23 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               className="text-xl font-semibold text-[#1A1D1B] dark:text-[#F1F3F2]"
             >
               {mode === 'login'
-                ? 'Sign in to QazaFlow'
+                ? tr('Sign in to QazaFlow', 'QazaFlow में साइन इन करें')
                 : mode === 'signup'
-                  ? 'Create your account'
-                  : 'Reset your password'}
+                  ? tr('Create your account', 'नया खाता बनाएं')
+                  : tr('Reset your password', 'पासवर्ड रीसेट करें')}
             </h2>
             <p className="mt-1 text-sm text-[#5C635E] dark:text-[#9AA59E]">
-              Save your Qaza ledger in the cloud and keep devices in sync.
+              {tr(
+                'Save your Qaza ledger in the cloud and keep devices in sync.',
+                'अपना रिकॉर्ड क्लाउड में सुरक्षित रखें और हर डिवाइस पर सिंक करें।'
+              )}
             </p>
           </div>
           <button
             type="button"
             onClick={onClose}
             className="min-h-[40px] min-w-[40px] flex items-center justify-center rounded-xl text-[#5C635E] hover:bg-[#F1EFE9] dark:hover:bg-[#1D2622] transition-colors"
-            aria-label="Close sign in dialog"
+            aria-label={tr('Close sign in dialog', 'बंद करें')}
           >
             <X className="w-5 h-5" />
           </button>
@@ -141,12 +160,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.31 0 3.26 2.7 1.29 6.62l3.99 3.14c.95-2.85 3.6-4.96 6.72-4.96z"
                 />
               </svg>
-              <span>Continue with Google</span>
+              <span>{tr('Continue with Google', 'Google से साइन इन करें')}</span>
             </button>
 
             <div className="flex items-center gap-3 text-xs text-[#7A827D]">
               <div className="h-px flex-1 bg-[#E5E2DC] dark:bg-[#242E2A]" />
-              <span>or with email</span>
+              <span>{tr('or with email', 'या ईमेल से')}</span>
               <div className="h-px flex-1 bg-[#E5E2DC] dark:bg-[#242E2A]" />
             </div>
           </>
@@ -156,7 +175,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           {mode === 'signup' && (
             <div>
               <label className="block text-xs font-medium text-[#5C635E] dark:text-[#9AA59E] mb-1.5">
-                Name
+                {tr('Name', 'नाम')}
               </label>
               <div className="relative">
                 <UserIcon className="w-4 h-4 text-[#7A827D] absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -164,7 +183,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   type="text"
                   value={displayName}
                   onChange={(e) => setDisplayName(e.target.value)}
-                  placeholder="Your name"
+                  placeholder={tr('Your name', 'आपका नाम')}
                   maxLength={100}
                   className="w-full min-h-[44px] pl-10 pr-3.5 rounded-xl border border-[#E5E2DC] dark:border-[#242E2A] bg-[#F8F7F4] dark:bg-[#0E1311] text-sm text-[#1A1D1B] dark:text-[#F1F3F2] focus:outline-none focus:ring-2 focus:ring-[#1B4D3E]"
                 />
@@ -174,7 +193,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
           <div>
             <label className="block text-xs font-medium text-[#5C635E] dark:text-[#9AA59E] mb-1.5">
-              Email address
+              {tr('Email address', 'ईमेल पता')}
             </label>
             <div className="relative">
               <Mail className="w-4 h-4 text-[#7A827D] absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -193,7 +212,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <label className="block text-xs font-medium text-[#5C635E] dark:text-[#9AA59E]">
-                  Password
+                  {tr('Password', 'पासवर्ड')}
                 </label>
                 {mode === 'login' && (
                   <button
@@ -205,7 +224,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     }}
                     className="text-xs text-[#1B4D3E] dark:text-[#7FD1B2] hover:underline"
                   >
-                    Forgot password?
+                    {tr('Forgot password?', 'पासवर्ड भूल गए?')}
                   </button>
                 )}
               </div>
@@ -217,7 +236,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   minLength={6}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Minimum 6 characters"
+                  placeholder={tr('Minimum 6 characters', 'कम से कम 6 अक्षर')}
                   className="w-full min-h-[44px] pl-10 pr-3.5 rounded-xl border border-[#E5E2DC] dark:border-[#242E2A] bg-[#F8F7F4] dark:bg-[#0E1311] text-sm text-[#1A1D1B] dark:text-[#F1F3F2] focus:outline-none focus:ring-2 focus:ring-[#1B4D3E]"
                 />
               </div>
@@ -244,12 +263,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           >
             <span>
               {loading
-                ? 'Please wait...'
+                ? tr('Please wait...', 'प्रतीक्षा करें...')
                 : mode === 'login'
-                  ? 'Sign In'
+                  ? tr('Sign In', 'साइन इन')
                   : mode === 'signup'
-                    ? 'Create Account'
-                    : 'Send Reset Link'}
+                    ? tr('Create Account', 'खाता बनाएं')
+                    : tr('Send Reset Link', 'रीसेट लिंक भेजें')}
             </span>
             <ArrowRight className="w-4 h-4" />
           </button>
@@ -258,7 +277,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         <div className="pt-2 border-t border-[#E5E2DC] dark:border-[#242E2A] flex items-center justify-between text-xs text-[#5C635E] dark:text-[#9AA59E]">
           {mode === 'login' ? (
             <>
-              <span>New to QazaFlow?</span>
+              <span>{tr('New to QazaFlow?', 'QazaFlow पर नए हैं?')}</span>
               <button
                 type="button"
                 onClick={() => {
@@ -268,12 +287,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 }}
                 className="font-medium text-[#1B4D3E] dark:text-[#7FD1B2] hover:underline"
               >
-                Create an account
+                {tr('Create an account', 'नया खाता बनाएं')}
               </button>
             </>
           ) : (
             <>
-              <span>Already have an account?</span>
+              <span>{tr('Already have an account?', 'पहले से खाता है?')}</span>
               <button
                 type="button"
                 onClick={() => {
@@ -283,7 +302,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 }}
                 className="font-medium text-[#1B4D3E] dark:text-[#7FD1B2] hover:underline"
               >
-                Back to sign in
+                {tr('Back to sign in', 'साइन इन पर वापस जाएं')}
               </button>
             </>
           )}

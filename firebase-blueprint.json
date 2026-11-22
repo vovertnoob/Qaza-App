@@ -381,6 +381,113 @@
         "version",
         "updatedAt"
       ]
+    },
+    "DeenTask": {
+      "title": "DeenTask",
+      "description": "Customizable daily or weekly Deen / Ibadah habit task (e.g. Tasbeeh, Quran, Dua, Sunnah).",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "userId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "titleHi": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "category": {
+          "type": "string",
+          "enum": ["tasbeeh", "quran", "sunnah", "dua", "charity", "custom"]
+        },
+        "targetCount": {
+          "type": "integer"
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 30
+        },
+        "frequency": {
+          "type": "string",
+          "enum": ["daily", "weekly"]
+        },
+        "isActive": {
+          "type": "boolean"
+        },
+        "sortOrder": {
+          "type": "integer"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "title",
+        "category",
+        "targetCount",
+        "unit",
+        "frequency",
+        "isActive",
+        "sortOrder",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "DeenDayLog": {
+      "title": "DeenDayLog",
+      "description": "Daily completion counts for customized Deen tasks on a specific YYYY-MM-DD date.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "date": {
+          "type": "string",
+          "maxLength": 10,
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "counts": {
+          "type": "object",
+          "description": "Map of taskId to completed count for this date (max 100 keys)."
+        },
+        "note": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "userId",
+        "date",
+        "counts",
+        "updatedAt"
+      ]
     }
   },
   "firestore": {
@@ -407,6 +514,14 @@
     "/users/{userId}/syncMetadata/{docId}": {
       "schema": { "$ref": "#/entities/SyncMetadata" },
       "description": "Sync and backup state metadata."
+    },
+    "/users/{userId}/deenTasks/{taskId}": {
+      "schema": { "$ref": "#/entities/DeenTask" },
+      "description": "User-customized daily and weekly Deen tasks."
+    },
+    "/users/{userId}/deenLogs/{dateKey}": {
+      "schema": { "$ref": "#/entities/DeenDayLog" },
+      "description": "Daily completion counts for Deen tasks keyed by YYYY-MM-DD."
     }
   }
 }

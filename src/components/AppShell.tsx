@@ -2,14 +2,17 @@ import React, { useMemo } from 'react';
 import {
   Activity,
   Bell,
+  BookOpen,
   CheckSquare,
   Cloud,
   CloudOff,
   Home,
+  Languages,
   RotateCcw,
   Settings,
   X,
 } from 'lucide-react';
+import { useLanguage } from '../context/LanguageContext';
 import { useQaza } from '../context/QazaContext';
 import { PRAYERS } from '../types/qaza';
 import type { NavTab } from './HomeDashboard';
@@ -21,13 +24,6 @@ interface AppShellProps {
   onOpenAuth: () => void;
   children: React.ReactNode;
 }
-
-const NAV_ITEMS: { id: NavTab; label: string; shortLabel: string; Icon: React.ElementType }[] = [
-  { id: 'home', label: 'Home', shortLabel: 'Home', Icon: Home },
-  { id: 'tracker', label: 'Qaza Tracker', shortLabel: 'Tracker', Icon: CheckSquare },
-  { id: 'activity', label: 'Activity', shortLabel: 'Activity', Icon: Activity },
-  { id: 'settings', label: 'Settings', shortLabel: 'Settings', Icon: Settings },
-];
 
 export const AppShell: React.FC<AppShellProps> = ({
   activeTab,
@@ -49,6 +45,15 @@ export const AppShell: React.FC<AppShellProps> = ({
     importGuestToCloud,
     dismissGuestImport,
   } = useQaza();
+  const { lang, toggleLang, tr } = useLanguage();
+
+  const navItems: { id: NavTab; label: string; shortLabel: string; Icon: React.ElementType }[] = [
+    { id: 'home', label: tr('Home', 'होम'), shortLabel: tr('Home', 'होम'), Icon: Home },
+    { id: 'tracker', label: tr('Qaza Tracker', 'क़ज़ा ट्रैकर'), shortLabel: tr('Qaza', 'क़ज़ा'), Icon: CheckSquare },
+    { id: 'deen', label: tr('Deen Tracker', 'दीन ट्रैकर'), shortLabel: tr('Deen', 'दीन'), Icon: BookOpen },
+    { id: 'activity', label: tr('Activity', 'गतिविधि'), shortLabel: tr('Activity', 'इतिहास'), Icon: Activity },
+    { id: 'settings', label: tr('Settings', 'सेटिंग्स'), shortLabel: tr('Settings', 'सेटिंग्स'), Icon: Settings },
+  ];
 
   const summary = useMemo(() => {
     let pending = 0;
@@ -62,30 +67,41 @@ export const AppShell: React.FC<AppShellProps> = ({
     return { pending, completed, pct };
   }, [snapshot.balances]);
 
-  const pageTitle = NAV_ITEMS.find((item) => item.id === activeTab)?.label || 'Home';
+  const pageTitle = navItems.find((item) => item.id === activeTab)?.label || tr('Home', 'होम');
 
   const syncLabel =
     syncState === 'offline'
-      ? 'Offline · Saved locally'
+      ? tr('Offline · Saved locally', 'ऑफ़लाइन · फ़ोन में सुरक्षित')
       : syncState === 'syncing'
-        ? 'Syncing changes'
+        ? tr('Syncing changes', 'सिंक हो रहा है')
         : syncState === 'synced'
-          ? 'Cloud synced'
-          : 'Local device mode';
+          ? tr('Cloud synced', 'क्लाउड से जुड़ा है')
+          : tr('Local device mode', 'लोकल डिवाइस मोड');
 
   return (
     <div className="min-h-screen bg-[#F8F7F4] dark:bg-[#0E1311] text-[#1A1D1B] dark:text-[#F1F3F2] flex">
       {/* Desktop Left Sidebar */}
       <aside className="hidden md:flex md:w-64 lg:w-72 md:flex-col md:fixed md:inset-y-0 border-r border-[#E5E2DC] dark:border-[#242E2A] bg-white dark:bg-[#151C19] z-30">
-        <div className="h-16 px-6 flex items-center gap-2.5 border-b border-[#E5E2DC] dark:border-[#242E2A]">
-          <img src="/icon.svg" alt="" className="w-7 h-7 rounded-lg" />
-          <span className="font-display text-lg font-semibold tracking-tight whitespace-nowrap shrink-0">
-            QazaFlow
-          </span>
+        <div className="h-16 px-5 flex items-center justify-between gap-2 border-b border-[#E5E2DC] dark:border-[#242E2A]">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <img src="/icon.svg" alt="" className="w-7 h-7 rounded-lg shrink-0" />
+            <span className="font-display text-lg font-semibold tracking-tight whitespace-nowrap">
+              QazaFlow
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={toggleLang}
+            aria-label={tr('Switch to Hindi', 'अंग्रेज़ी में बदलें')}
+            className="min-h-[34px] px-2.5 rounded-lg border border-[#E5E2DC] dark:border-[#242E2A] bg-[#F8F7F4] dark:bg-[#0E1311] hover:border-[#1B4D3E] text-xs font-medium inline-flex items-center gap-1.5 whitespace-nowrap shrink-0"
+          >
+            <Languages className="w-3.5 h-3.5 text-[#1B4D3E] dark:text-[#7FD1B2]" />
+            <span>{lang === 'en' ? 'हिंदी' : 'EN'}</span>
+          </button>
         </div>
 
-        <nav className="flex-1 px-3 py-5 space-y-1" aria-label="Primary navigation">
-          {NAV_ITEMS.map(({ id, label, Icon }) => {
+        <nav className="flex-1 px-3 py-5 space-y-1" aria-label={tr('Primary navigation', 'मुख्य नेविगेशन')}>
+          {navItems.map(({ id, label, Icon }) => {
             const active = activeTab === id;
             return (
               <button
@@ -109,7 +125,7 @@ export const AppShell: React.FC<AppShellProps> = ({
         <div className="p-4 space-y-3 border-t border-[#E5E2DC] dark:border-[#242E2A]">
           <div className="p-4 rounded-xl bg-[#F8F7F4] dark:bg-[#0E1311] border border-[#E5E2DC] dark:border-[#242E2A] space-y-2.5">
             <div className="flex items-center justify-between text-xs text-[#5C635E] dark:text-[#9AA59E]">
-              <span>Remaining Qaza</span>
+              <span>{tr('Remaining Qaza', 'बाक़ी क़ज़ा')}</span>
               <span className="font-mono-num font-medium text-[#1B4D3E] dark:text-[#7FD1B2]">
                 {summary.pct}%
               </span>
@@ -124,7 +140,7 @@ export const AppShell: React.FC<AppShellProps> = ({
               />
             </div>
             <p className="text-[11px] text-[#7A827D] font-mono-num">
-              {summary.completed.toLocaleString()} completed
+              {summary.completed.toLocaleString()} {tr('completed', 'पूरी हुईं')}
             </p>
           </div>
 
@@ -148,7 +164,7 @@ export const AppShell: React.FC<AppShellProps> = ({
               className="w-full min-h-[42px] px-3.5 rounded-xl border border-[#E5E2DC] dark:border-[#242E2A] text-xs font-medium text-[#1A1D1B] dark:text-[#F1F3F2] hover:bg-[#F8F7F4] dark:hover:bg-[#0E1311] flex items-center justify-center gap-2"
             >
               <Cloud className="w-3.5 h-3.5 text-[#1B4D3E] dark:text-[#7FD1B2]" />
-              <span>Sign in for Cloud Sync</span>
+              <span>{tr('Sign in for Cloud Sync', 'क्लाउड बैकअप के लिए साइन इन')}</span>
             </button>
           )}
         </div>
@@ -157,7 +173,7 @@ export const AppShell: React.FC<AppShellProps> = ({
       {/* Main Viewport */}
       <div className="flex-1 md:pl-64 lg:pl-72 flex flex-col min-w-0">
         {/* Compact Top Header */}
-        <header className="sticky top-0 z-20 h-[52px] md:h-16 bg-[#F8F7F4]/90 dark:bg-[#0E1311]/90 backdrop-blur-md border-b border-[#E5E2DC] dark:border-[#242E2A] px-4 sm:px-8 flex items-center justify-between gap-4">
+        <header className="sticky top-0 z-20 h-[52px] md:h-16 bg-[#F8F7F4]/90 dark:bg-[#0E1311]/90 backdrop-blur-md border-b border-[#E5E2DC] dark:border-[#242E2A] px-4 sm:px-8 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2.5 min-w-0">
             <img src="/icon.svg" alt="" className="w-6 h-6 rounded-md md:hidden shrink-0" />
             <h1 className="text-base sm:text-lg font-semibold tracking-tight truncate">
@@ -165,27 +181,39 @@ export const AppShell: React.FC<AppShellProps> = ({
             </h1>
           </div>
 
-          <div className="flex items-center gap-2.5 shrink-0">
+          <div className="flex items-center gap-2 shrink-0">
             {!isOnline && (
               <span className="inline-flex items-center gap-1.5 text-xs font-medium text-[#B88E44] dark:text-[#D4AA5E] whitespace-nowrap">
                 <CloudOff className="w-3.5 h-3.5" />
-                <span>Offline</span>
+                <span className="hidden sm:inline">{tr('Offline', 'ऑफ़लाइन')}</span>
               </span>
             )}
+
+            <button
+              type="button"
+              onClick={toggleLang}
+              aria-label={tr('Switch to Hindi', 'Switch to English')}
+              className="min-h-[36px] px-2.5 rounded-lg border border-[#E5E2DC] dark:border-[#242E2A] bg-white dark:bg-[#151C19] text-xs font-medium inline-flex items-center gap-1.5 whitespace-nowrap"
+            >
+              <Languages className="w-3.5 h-3.5 text-[#1B4D3E] dark:text-[#7FD1B2]" />
+              <span>{lang === 'en' ? 'हिंदी' : 'English'}</span>
+            </button>
+
             <div className="md:hidden">
               <PWAInstallButton compact />
             </div>
+
             {!user && (
               <button
                 type="button"
                 onClick={onOpenAuth}
-                className="md:hidden min-h-[36px] px-3 rounded-lg border border-[#E5E2DC] dark:border-[#242E2A] bg-white dark:bg-[#151C19] text-xs font-medium whitespace-nowrap"
+                className="md:hidden min-h-[36px] px-2.5 rounded-lg border border-[#E5E2DC] dark:border-[#242E2A] bg-white dark:bg-[#151C19] text-xs font-medium whitespace-nowrap"
               >
-                Sign In
+                {tr('Sign In', 'साइन इन')}
               </button>
             )}
             {user && (
-              <span className="hidden sm:inline text-xs text-[#5C635E] dark:text-[#9AA59E] truncate max-w-[200px]">
+              <span className="hidden sm:inline text-xs text-[#5C635E] dark:text-[#9AA59E] truncate max-w-[180px]">
                 {user.email || user.displayName}
               </span>
             )}
@@ -197,8 +225,10 @@ export const AppShell: React.FC<AppShellProps> = ({
           {!isOnline && (
             <div className="rounded-xl border border-[#B88E44]/40 bg-[#B88E44]/10 px-4 py-2.5 text-xs text-[#1A1D1B] dark:text-[#F1F3F2] flex items-center justify-between gap-3">
               <span>
-                Offline mode active. Your Qaza logs are saved locally and will sync automatically
-                when you reconnect.
+                {tr(
+                  'Offline mode active. Your Qaza & Deen logs are saved locally and will sync automatically when you reconnect.',
+                  'ऑफ़लाइन मोड चालू है। आपका क़ज़ा और दीन रिकॉर्ड डिवाइस में सेव है और इंटरनेट आते ही अपने आप सिंक हो जाएगा।'
+                )}
               </span>
             </div>
           )}
@@ -212,7 +242,7 @@ export const AppShell: React.FC<AppShellProps> = ({
               <button
                 type="button"
                 onClick={dismissInAppReminder}
-                aria-label="Dismiss reminder"
+                aria-label={tr('Dismiss reminder', 'बंद करें')}
                 className="p-1 text-[#5C635E] hover:text-[#1A1D1B]"
               >
                 <X className="w-4 h-4" />
@@ -223,8 +253,10 @@ export const AppShell: React.FC<AppShellProps> = ({
           {hasGuestImportAvailable && (
             <div className="rounded-xl border border-[#1B4D3E]/30 bg-white dark:bg-[#151C19] px-4 py-3 text-xs flex flex-wrap items-center justify-between gap-3">
               <span>
-                Local guest progress was found on this device. Would you like to merge it into your
-                account?
+                {tr(
+                  'Local guest progress was found on this device. Would you like to merge it into your account?',
+                  'इस डिवाइस पर लोकल डेटा मिला है। क्या आप इसे अपने खाते में जोड़ना चाहते हैं?'
+                )}
               </span>
               <div className="flex items-center gap-2">
                 <button
@@ -232,14 +264,14 @@ export const AppShell: React.FC<AppShellProps> = ({
                   onClick={() => void importGuestToCloud()}
                   className="px-3 py-1.5 rounded-lg bg-[#1B4D3E] text-white font-medium"
                 >
-                  Merge Progress
+                  {tr('Merge Progress', 'डेटा जोड़ें')}
                 </button>
                 <button
                   type="button"
                   onClick={dismissGuestImport}
                   className="px-3 py-1.5 rounded-lg border border-[#E5E2DC] dark:border-[#242E2A]"
                 >
-                  Dismiss
+                  {tr('Dismiss', 'हटाएं')}
                 </button>
               </div>
             </div>
@@ -254,24 +286,24 @@ export const AppShell: React.FC<AppShellProps> = ({
 
       {/* Mobile Bottom Navigation */}
       <nav
-        aria-label="Mobile navigation"
-        className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-[#151C19]/95 backdrop-blur-md border-t border-[#E5E2DC] dark:border-[#242E2A] grid grid-cols-4 h-16 pb-safe"
+        aria-label={tr('Mobile navigation', 'मोबाइल नेविगेशन')}
+        className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-[#151C19]/95 backdrop-blur-md border-t border-[#E5E2DC] dark:border-[#242E2A] grid grid-cols-5 h-16 pb-safe"
       >
-        {NAV_ITEMS.map(({ id, shortLabel, Icon }) => {
+        {navItems.map(({ id, shortLabel, Icon }) => {
           const active = activeTab === id;
           return (
             <button
               key={id}
               type="button"
               onClick={() => onNavigate(id)}
-              className={`min-h-[44px] flex flex-col items-center justify-center gap-1 transition-colors ${
+              className={`min-h-[44px] flex flex-col items-center justify-center gap-1 transition-colors px-1 ${
                 active
                   ? 'text-[#1B4D3E] dark:text-[#7FD1B2] font-semibold'
                   : 'text-[#5C635E] dark:text-[#9AA59E]'
               }`}
             >
               <Icon className="w-5 h-5" />
-              <span className="text-[11px] leading-none">{shortLabel}</span>
+              <span className="text-[10px] leading-none truncate max-w-full">{shortLabel}</span>
             </button>
           );
         })}
@@ -292,12 +324,12 @@ export const AppShell: React.FC<AppShellProps> = ({
               className="min-h-[34px] px-3 rounded-lg bg-[#2E7D5B] text-white text-xs font-medium inline-flex items-center gap-1.5 hover:bg-[#25664A]"
             >
               <RotateCcw className="w-3.5 h-3.5" />
-              <span>Undo</span>
+              <span>{tr('Undo', 'वापस लें')}</span>
             </button>
             <button
               type="button"
               onClick={dismissUndoToast}
-              aria-label="Close notification"
+              aria-label={tr('Close notification', 'सूचना बंद करें')}
               className="p-1 opacity-70 hover:opacity-100"
             >
               <X className="w-4 h-4" />

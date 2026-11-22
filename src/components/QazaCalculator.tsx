@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Calculator, Check, CheckCircle2, ChevronDown, Info, Sparkles } from 'lucide-react';
+import { useLanguage } from '../context/LanguageContext';
 import { PRAYERS, type PrayerType } from '../types/qaza';
 
 interface QazaCalculatorProps {
@@ -37,6 +38,7 @@ const AgeField: React.FC<AgeFieldProps> = ({
   disabled = false,
   inputBgClass = 'bg-[#F8F7F4] dark:bg-[#0E1311]',
 }) => {
+  const { tr } = useLanguage();
   const options = useMemo(() => {
     const arr: number[] = [];
     for (let a = min; a <= max; a += 1) arr.push(a);
@@ -91,11 +93,11 @@ const AgeField: React.FC<AgeFieldProps> = ({
           className="appearance-none bg-transparent pl-3 pr-7 min-h-[44px] text-xs font-medium text-[#5C635E] dark:text-[#9AA59E] cursor-pointer focus:outline-none"
         >
           <option value="" disabled>
-            Pick
+            {tr('Pick', 'चुनें')}
           </option>
           {options.map((age) => (
             <option key={age} value={String(age)}>
-              {age} yrs
+              {age} {tr('yrs', 'साल')}
             </option>
           ))}
         </select>
@@ -112,6 +114,7 @@ export const QazaCalculator: React.FC<QazaCalculatorProps> = ({
   onOpenFinishTime,
   onClose,
 }) => {
+  const { tr, prayerLabel } = useLanguage();
   const [inputMode, setInputMode] = useState<'age' | 'duration'>('age');
   const [currentAgeText, setCurrentAgeText] = useState<string>('28');
   const [obligationAgeText, setObligationAgeText] = useState<string>('13');
@@ -121,12 +124,10 @@ export const QazaCalculator: React.FC<QazaCalculatorProps> = ({
   const [durationYearsText, setDurationYearsText] = useState<string>('5');
   const [durationMonthsText, setDurationMonthsText] = useState<string>('0');
 
-  // Easy-to-understand prayer exemptions (no confusing percentage bar required)
   const [neverMissedJummah, setNeverMissedJummah] = useState<boolean>(false);
   const [prayedAllFiveOnFridays, setPrayedAllFiveOnFridays] = useState<boolean>(false);
   const [neverMissedRamadan, setNeverMissedRamadan] = useState<boolean>(false);
 
-  // Optional advanced refinements
   const [showAdvanced, setShowAdvanced] = useState<boolean>(false);
   const [calendarBasis, setCalendarBasis] = useState<'solar' | 'lunar'>('solar');
   const [consistencyPct, setConsistencyPct] = useState<number>(0);
@@ -160,19 +161,15 @@ export const QazaCalculator: React.FC<QazaCalculatorProps> = ({
     }
 
     const grossDays = totalYears * daysPerYear;
-
-    // Deduct optional monthly exempt days (scaled cleanly within grossDays)
     const exemptDaysPerYear = Math.max(0, Math.min(15, monthlyExemptDays)) * 12;
     const exemptRatio = grossDays > 0 ? Math.max(0, 1 - (totalYears * exemptDaysPerYear) / grossDays) : 1;
     const obligatoryDays = grossDays * exemptRatio;
 
-    // 1. Ramadan deduction (~30 days per year, scaled if monthly exemptions apply)
     const ramadanDaysDeducted = neverMissedRamadan
       ? Math.min(obligatoryDays, totalYears * 30 * exemptRatio)
       : 0;
     const daysAfterRamadan = Math.max(0, obligatoryDays - ramadanDaysDeducted);
 
-    // 2. Jummah / Friday deduction (calculated on non-Ramadan days so Ramadan Fridays aren't double-deducted)
     const jummahFridaysDeducted = neverMissedJummah ? daysAfterRamadan / 7 : 0;
 
     const remainingGeneralDays = prayedAllFiveOnFridays && neverMissedJummah
@@ -183,7 +180,6 @@ export const QazaCalculator: React.FC<QazaCalculatorProps> = ({
       ? Math.max(0, daysAfterRamadan - jummahFridaysDeducted)
       : remainingGeneralDays;
 
-    // 3. Optional additional partial consistency & caution buffer
     const missedRatio = Math.max(0, Math.min(1, 1 - consistencyPct / 100));
     const bufferMult = 1 + cautionBufferPct / 100;
 
@@ -228,13 +224,13 @@ export const QazaCalculator: React.FC<QazaCalculatorProps> = ({
   ]);
 
   const formatDurationEstimate = (dailyRate: number): string => {
-    if (calculation.totalPrayers === 0) return '0 days';
+    if (calculation.totalPrayers === 0) return tr('0 days', '0 दिन');
     const days = Math.ceil(calculation.totalPrayers / dailyRate);
-    if (days < 60) return `~${days} days`;
+    if (days < 60) return tr(`~${days} days`, `~${days} दिन`);
     const months = Math.round(days / 30.4);
-    if (months < 24) return `~${months} months`;
+    if (months < 24) return tr(`~${months} months`, `~${months} महीने`);
     const years = (days / 365.25).toFixed(1);
-    return `~${years} years`;
+    return tr(`~${years} years`, `~${years} साल`);
   };
 
   const handleApply = async (strategy: 'replace' | 'add') => {
@@ -259,8 +255,14 @@ export const QazaCalculator: React.FC<QazaCalculatorProps> = ({
       await onApplyBalances(calculation.perPrayer, strategy, summaryNote);
       setAppliedBanner(
         strategy === 'replace'
-          ? `Applied ${calculation.totalPrayers.toLocaleString()} prayers as your starting balance.`
-          : `Added ${calculation.totalPrayers.toLocaleString()} prayers to your pending balance.`
+          ? tr(
+              `Applied ${calculation.totalPrayers.toLocaleString()} prayers as your starting balance.`,
+              `${calculation.totalPrayers.toLocaleString()} नमाज़ें शुरुआती हिसाब में दर्ज हो गईं।`
+            )
+          : tr(
+              `Added ${calculation.totalPrayers.toLocaleString()} prayers to your pending balance.`,
+              `${calculation.totalPrayers.toLocaleString()} नमाज़ें आपकी बाक़ी गिनती में जोड़ दी गईं।`
+            )
       );
       window.setTimeout(() => setAppliedBanner(null), 4500);
     } finally {
@@ -276,9 +278,14 @@ export const QazaCalculator: React.FC<QazaCalculatorProps> = ({
             <Calculator className="w-5 h-5 text-[#1B4D3E] dark:text-[#7FD1B2]" />
           </div>
           <div>
-            <h2 className="text-lg font-semibold">Qaza Namaz Calculator</h2>
+            <h2 className="text-lg font-semibold">
+              {tr('Qaza Namaz Calculator', 'क़ज़ा नमाज़ कैलकुलेटर')}
+            </h2>
             <p className="text-xs text-[#5C635E] dark:text-[#9AA59E]">
-              Estimate pending Qaza prayers from your age and easily deduct Jummah or Ramadan prayers you never missed.
+              {tr(
+                'Estimate pending Qaza prayers from your age and easily deduct Jummah or Ramadan prayers you never missed.',
+                'अपनी उम्र से बाक़ी क़ज़ा का अंदाज़ा लगाएं और जुमा या रमज़ान की पढ़ी हुई नमाज़ें आसानी से घटाएं।'
+              )}
             </p>
           </div>
         </div>
@@ -293,7 +300,7 @@ export const QazaCalculator: React.FC<QazaCalculatorProps> = ({
                 : 'text-[#5C635E] dark:text-[#9AA59E]'
             }`}
           >
-            By Age
+            {tr('By Age', 'उम्र से')}
           </button>
           <button
             type="button"
@@ -304,13 +311,12 @@ export const QazaCalculator: React.FC<QazaCalculatorProps> = ({
                 : 'text-[#5C635E] dark:text-[#9AA59E]'
             }`}
           >
-            By Years & Months
+            {tr('By Years & Months', 'साल और महीनों से')}
           </button>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Inputs Column */}
         <div className="lg:col-span-7 space-y-5">
           {inputMode === 'age' ? (
             <div className="space-y-4">
@@ -320,11 +326,11 @@ export const QazaCalculator: React.FC<QazaCalculatorProps> = ({
                     htmlFor="calc-current-age"
                     className="block text-xs font-medium text-[#5C635E] dark:text-[#9AA59E] mb-1.5"
                   >
-                    Your current age
+                    {tr('Your current age', 'आपकी मौजूदा उम्र')}
                   </label>
                   <AgeField
                     id="calc-current-age"
-                    label="Your current age"
+                    label={tr('Your current age', 'आपकी मौजूदा उम्र')}
                     valueText={currentAgeText}
                     onChangeText={(next) => {
                       setCurrentAgeText(next);
@@ -344,11 +350,11 @@ export const QazaCalculator: React.FC<QazaCalculatorProps> = ({
                     htmlFor="calc-obligation-age"
                     className="block text-xs font-medium text-[#5C635E] dark:text-[#9AA59E] mb-1.5"
                   >
-                    Age prayers became obligatory
+                    {tr('Age prayers became obligatory', 'नमाज़ फ़र्ज़ होने की उम्र (बालिग़)')}
                   </label>
                   <AgeField
                     id="calc-obligation-age"
-                    label="Age prayers became obligatory"
+                    label={tr('Age prayers became obligatory', 'बालिग़ होने की उम्र')}
                     valueText={obligationAgeText}
                     onChangeText={setObligationAgeText}
                     min={7}
@@ -356,7 +362,7 @@ export const QazaCalculator: React.FC<QazaCalculatorProps> = ({
                     fallback={13}
                   />
                   <p className="mt-1 text-[11px] text-[#7A827D]">
-                    Often estimated around 12–15 depending on maturity.
+                    {tr('Often estimated around 12–15 depending on maturity.', 'अक्सर 12–15 साल के आसपास मानी जाती है।')}
                   </p>
                 </div>
               </div>
@@ -367,7 +373,7 @@ export const QazaCalculator: React.FC<QazaCalculatorProps> = ({
                     htmlFor="calc-regular-age"
                     className="text-xs font-medium text-[#1A1D1B] dark:text-[#F1F3F2]"
                   >
-                    Age you started praying regularly
+                    {tr('Age you started praying regularly', 'पाबंदी से नमाज़ शुरू करने की उम्र')}
                   </label>
                   <label className="inline-flex items-center gap-2 text-xs text-[#5C635E] dark:text-[#9AA59E] cursor-pointer">
                     <input
@@ -376,13 +382,13 @@ export const QazaCalculator: React.FC<QazaCalculatorProps> = ({
                       onChange={(e) => setStillNotRegular(e.target.checked)}
                       className="w-4 h-4 accent-[#1B4D3E]"
                     />
-                    <span>Starting now (age {currentAge || 7})</span>
+                    <span>{tr(`Starting now (age ${currentAge || 7})`, `अभी शुरू कर रहे हैं (${currentAge || 7} साल)`)}</span>
                   </label>
                 </div>
 
                 <AgeField
                   id="calc-regular-age"
-                  label="Age you started praying regularly"
+                  label={tr('Age you started praying regularly', 'पाबंदी की उम्र')}
                   disabled={stillNotRegular}
                   valueText={stillNotRegular ? String(currentAge || 7) : startedRegularAgeText}
                   onChangeText={setStartedRegularAgeText}
@@ -400,7 +406,7 @@ export const QazaCalculator: React.FC<QazaCalculatorProps> = ({
                   htmlFor="calc-duration-years"
                   className="block text-xs font-medium text-[#5C635E] dark:text-[#9AA59E] mb-1.5"
                 >
-                  Missed years
+                  {tr('Missed years', 'छूटे हुए साल')}
                 </label>
                 <input
                   id="calc-duration-years"
@@ -426,7 +432,7 @@ export const QazaCalculator: React.FC<QazaCalculatorProps> = ({
                   htmlFor="calc-duration-months"
                   className="block text-xs font-medium text-[#5C635E] dark:text-[#9AA59E] mb-1.5"
                 >
-                  Additional months
+                  {tr('Additional months', 'अतिरिक्त महीने')}
                 </label>
                 <input
                   id="calc-duration-months"
@@ -450,18 +456,20 @@ export const QazaCalculator: React.FC<QazaCalculatorProps> = ({
             </div>
           )}
 
-          {/* Simple One-Tap Deductions: Jummah & Ramadan */}
+          {/* Auto-Deduct */}
           <div className="pt-4 border-t border-[#E5E2DC] dark:border-[#242E2A] space-y-3">
             <div>
               <p className="text-xs font-medium text-[#1A1D1B] dark:text-[#F1F3F2]">
-                Prayers you did not miss (Auto-Deduct)
+                {tr('Prayers you did not miss (Auto-Deduct)', 'जो नमाज़ें आपने नहीं छोड़ीं (अपने आप घटाएं)')}
               </p>
               <p className="text-[11px] text-[#7A827D] mt-0.5">
-                Select any prayers you consistently kept up during those years.
+                {tr(
+                  'Select any prayers you consistently kept up during those years.',
+                  'अगर आपने उन सालों में रमज़ान या जुमे की नमाज़ें पढ़ी हैं तो चुनें।'
+                )}
               </p>
             </div>
 
-            {/* Ramadan Toggle */}
             <button
               type="button"
               onClick={() => setNeverMissedRamadan((v) => !v)}
@@ -474,14 +482,12 @@ export const QazaCalculator: React.FC<QazaCalculatorProps> = ({
             >
               <div className="space-y-0.5">
                 <p className="text-sm font-medium text-[#1A1D1B] dark:text-[#F1F3F2]">
-                  I never missed prayers in Ramadan
+                  {tr('I never missed prayers in Ramadan', 'मैंने रमज़ान की नमाज़ें कभी नहीं छोड़ीं')}
                 </p>
                 <p className="text-xs text-[#5C635E] dark:text-[#9AA59E]">
-                  Auto-deducts 30 days per year from all 5 prayers
+                  {tr('Auto-deducts 30 days per year from all 5 prayers', 'पांचों नमाज़ों से हर साल के 30 दिन घटाता है')}
                   {neverMissedRamadan && calculation.ramadanDaysRounded > 0
-                    ? ` (−${calculation.ramadanDaysRounded.toLocaleString()} days / −${(
-                        calculation.ramadanDaysRounded * 5
-                      ).toLocaleString()} prayers)`
+                    ? ` (−${calculation.ramadanDaysRounded.toLocaleString()} ${tr('days', 'दिन')})`
                     : ''}
                 </p>
               </div>
@@ -496,7 +502,6 @@ export const QazaCalculator: React.FC<QazaCalculatorProps> = ({
               </span>
             </button>
 
-            {/* Jummah Toggle */}
             <div className="space-y-2">
               <button
                 type="button"
@@ -510,12 +515,12 @@ export const QazaCalculator: React.FC<QazaCalculatorProps> = ({
               >
                 <div className="space-y-0.5">
                   <p className="text-sm font-medium text-[#1A1D1B] dark:text-[#F1F3F2]">
-                    I never missed a Jummah prayer
+                    {tr('I never missed a Jummah prayer', 'मैंने जुमा की नमाज़ कभी नहीं छोड़ी')}
                   </p>
                   <p className="text-xs text-[#5C635E] dark:text-[#9AA59E]">
-                    Auto-deducts Fridays from Dhuhr (without double-counting Ramadan Fridays)
+                    {tr('Auto-deducts Fridays from Dhuhr', 'ज़ुहर से हर जुमे के दिन घटाता है')}
                     {neverMissedJummah && calculation.jummahFridaysRounded > 0
-                      ? ` (−${calculation.jummahFridaysRounded.toLocaleString()} Dhuhr)`
+                      ? ` (−${calculation.jummahFridaysRounded.toLocaleString()} ${prayerLabel('dhuhr')})`
                       : ''}
                   </p>
                 </div>
@@ -542,7 +547,7 @@ export const QazaCalculator: React.FC<QazaCalculatorProps> = ({
                           : 'text-[#5C635E] dark:text-[#9AA59E]'
                       }`}
                     >
-                      Jummah only (deduct Dhuhr)
+                      {tr('Jummah only (deduct Dhuhr)', 'सिर्फ़ जुमा (ज़ुहर घटाएं)')}
                     </button>
                     <button
                       type="button"
@@ -553,7 +558,7 @@ export const QazaCalculator: React.FC<QazaCalculatorProps> = ({
                           : 'text-[#5C635E] dark:text-[#9AA59E]'
                       }`}
                     >
-                      All 5 prayers every Friday
+                      {tr('All 5 prayers every Friday', 'जुमे को पांचों नमाज़ें')}
                     </button>
                   </div>
                 </div>
@@ -561,7 +566,7 @@ export const QazaCalculator: React.FC<QazaCalculatorProps> = ({
             </div>
           </div>
 
-          {/* Optional Advanced Refinements Toggle */}
+          {/* Optional Advanced */}
           <div className="pt-2">
             <button
               type="button"
@@ -569,8 +574,11 @@ export const QazaCalculator: React.FC<QazaCalculatorProps> = ({
               className="text-xs font-medium text-[#1B4D3E] dark:text-[#7FD1B2] hover:underline"
             >
               {showAdvanced
-                ? 'Hide additional refinements'
-                : '+ More options (exempt days, Lunar/Solar year, caution buffer)'}
+                ? tr('Hide additional refinements', 'अतिरिक्त विकल्प छुपाएं')
+                : tr(
+                    '+ More options (exempt days, Lunar/Solar year, caution buffer)',
+                    '+ और विकल्प (माफ़ दिन, चांद/सूरज साल, बफ़र)'
+                  )}
             </button>
 
             {showAdvanced && (
@@ -581,7 +589,7 @@ export const QazaCalculator: React.FC<QazaCalculatorProps> = ({
                       htmlFor="calc-exempt-days"
                       className="block text-xs text-[#5C635E] dark:text-[#9AA59E] mb-1"
                     >
-                      Exempt days / month
+                      {tr('Exempt days / month', 'छूट वाले दिन / महीना')}
                     </label>
                     <input
                       id="calc-exempt-days"
@@ -608,7 +616,7 @@ export const QazaCalculator: React.FC<QazaCalculatorProps> = ({
                       htmlFor="calc-calendar-basis"
                       className="block text-xs text-[#5C635E] dark:text-[#9AA59E] mb-1"
                     >
-                      Year length
+                      {tr('Year length', 'साल का हिसाब')}
                     </label>
                     <select
                       id="calc-calendar-basis"
@@ -616,8 +624,8 @@ export const QazaCalculator: React.FC<QazaCalculatorProps> = ({
                       onChange={(e) => setCalendarBasis(e.target.value as 'solar' | 'lunar')}
                       className="w-full min-h-[40px] px-2.5 rounded-xl border border-[#E5E2DC] dark:border-[#242E2A] bg-white dark:bg-[#151C19] text-xs"
                     >
-                      <option value="solar">Solar (365 days/yr)</option>
-                      <option value="lunar">Lunar / Hijri (354 days/yr)</option>
+                      <option value="solar">{tr('Solar (365 days/yr)', 'अंग्रेज़ी साल (365 दिन)')}</option>
+                      <option value="lunar">{tr('Lunar / Hijri (354 days/yr)', 'इस्लामी / हिजरी (354 दिन)')}</option>
                     </select>
                   </div>
 
@@ -626,7 +634,7 @@ export const QazaCalculator: React.FC<QazaCalculatorProps> = ({
                       htmlFor="calc-caution-buffer"
                       className="block text-xs text-[#5C635E] dark:text-[#9AA59E] mb-1"
                     >
-                      Caution buffer
+                      {tr('Caution buffer', 'एहतियात बफ़र')}
                     </label>
                     <select
                       id="calc-caution-buffer"
@@ -634,9 +642,9 @@ export const QazaCalculator: React.FC<QazaCalculatorProps> = ({
                       onChange={(e) => setCautionBufferPct(parseInt(e.target.value, 10))}
                       className="w-full min-h-[40px] px-2.5 rounded-xl border border-[#E5E2DC] dark:border-[#242E2A] bg-white dark:bg-[#151C19] text-xs"
                     >
-                      <option value={0}>None (0%)</option>
-                      <option value={5}>+5% buffer</option>
-                      <option value={10}>+10% buffer</option>
+                      <option value={0}>{tr('None (0%)', 'कोई नहीं (0%)')}</option>
+                      <option value={5}>+5%</option>
+                      <option value={10}>+10%</option>
                     </select>
                   </div>
                 </div>
@@ -646,7 +654,10 @@ export const QazaCalculator: React.FC<QazaCalculatorProps> = ({
                     htmlFor="calc-extra-consistency"
                     className="block text-xs text-[#5C635E] dark:text-[#9AA59E] mb-1"
                   >
-                    Other prayers offered outside Ramadan/Jummah (optional)
+                    {tr(
+                      'Other prayers offered outside Ramadan/Jummah (optional)',
+                      'रमज़ान/जुमे के अलावा जो नमाज़ें पढ़ीं (वैकल्पिक)'
+                    )}
                   </label>
                   <select
                     id="calc-extra-consistency"
@@ -654,11 +665,11 @@ export const QazaCalculator: React.FC<QazaCalculatorProps> = ({
                     onChange={(e) => setConsistencyPct(parseInt(e.target.value, 10))}
                     className="w-full sm:w-64 min-h-[40px] px-2.5 rounded-xl border border-[#E5E2DC] dark:border-[#242E2A] bg-white dark:bg-[#151C19] text-xs"
                   >
-                    <option value={0}>None (0% additional deduction)</option>
-                    <option value={10}>Occasionally (~10%)</option>
-                    <option value={25}>About a quarter (~25%)</option>
-                    <option value={50}>About half (~50%)</option>
-                    <option value={75}>Most of the time (~75%)</option>
+                    <option value={0}>{tr('None (0% additional deduction)', 'कोई नहीं (0%)')}</option>
+                    <option value={10}>{tr('Occasionally (~10%)', 'कभी-कभी (~10%)')}</option>
+                    <option value={25}>{tr('About a quarter (~25%)', 'लगभग एक चौथाई (~25%)')}</option>
+                    <option value={50}>{tr('About half (~50%)', 'लगभग आधी (~50%)')}</option>
+                    <option value={75}>{tr('Most of the time (~75%)', 'ज़्यादातर (~75%)')}</option>
                   </select>
                 </div>
               </div>
@@ -666,49 +677,36 @@ export const QazaCalculator: React.FC<QazaCalculatorProps> = ({
           </div>
         </div>
 
-        {/* Live Result & Pace Forecast Column */}
+        {/* Live Result Column */}
         <div className="lg:col-span-5 rounded-2xl bg-[#F8F7F4] dark:bg-[#0E1311] border border-[#E5E2DC] dark:border-[#242E2A] p-5 space-y-4">
           <div className="flex items-baseline justify-between gap-2">
             <div>
-              <p className="text-xs text-[#5C635E] dark:text-[#9AA59E]">Estimated Period</p>
+              <p className="text-xs text-[#5C635E] dark:text-[#9AA59E]">
+                {tr('Estimated Period', 'अंदाज़न अवधि')}
+              </p>
               <p className="text-base font-semibold font-mono-num">
-                {calculation.totalYears} {calculation.totalYears === 1 ? 'year' : 'years'} ·{' '}
-                {calculation.grossDaysRounded.toLocaleString()} base days
+                {calculation.totalYears} {tr(calculation.totalYears === 1 ? 'year' : 'years', 'साल')} ·{' '}
+                {calculation.grossDaysRounded.toLocaleString()} {tr('base days', 'दिन')}
               </p>
             </div>
             <div className="text-right">
-              <p className="text-xs text-[#5C635E] dark:text-[#9AA59E]">Total Qaza</p>
+              <p className="text-xs text-[#5C635E] dark:text-[#9AA59E]">
+                {tr('Total Qaza', 'कुल क़ज़ा')}
+              </p>
               <p className="text-2xl font-semibold font-mono-num text-[#1B4D3E] dark:text-[#7FD1B2]">
                 {calculation.totalPrayers.toLocaleString()}
               </p>
             </div>
           </div>
 
-          {(neverMissedRamadan || neverMissedJummah) && (
-            <div className="text-[11px] text-[#2E7D5B] dark:text-[#7FD1B2] bg-[#1B4D3E]/6 dark:bg-[#2A6F5A]/15 rounded-lg px-3 py-2 font-mono-num">
-              {[
-                neverMissedRamadan
-                  ? `Ramadan: −${calculation.ramadanDaysRounded.toLocaleString()} days/prayer`
-                  : null,
-                neverMissedJummah
-                  ? prayedAllFiveOnFridays
-                    ? `Fridays: −${calculation.jummahFridaysRounded.toLocaleString()} days/prayer`
-                    : `Jummah: −${calculation.jummahFridaysRounded.toLocaleString()} Dhuhr`
-                  : null,
-              ]
-                .filter(Boolean)
-                .join(' · ')}
-            </div>
-          )}
-
           <div className="divide-y divide-[#E5E2DC] dark:divide-[#242E2A] border border-[#E5E2DC] dark:border-[#242E2A] rounded-xl bg-white dark:bg-[#151C19] overflow-hidden">
             {PRAYERS.map((p) => (
               <div key={p.id} className="px-3.5 py-2 flex items-center justify-between text-xs">
                 <div>
-                  <span className="font-medium">{p.label}</span>
+                  <span className="font-medium">{prayerLabel(p.id)}</span>
                   {p.id === 'dhuhr' && neverMissedJummah && !prayedAllFiveOnFridays && (
                     <span className="ml-1.5 text-[11px] text-[#7A827D]">
-                      (excl. Jummah)
+                      ({tr('excl. Jummah', 'जुमा घटाकर')})
                     </span>
                   )}
                 </div>
@@ -719,12 +717,11 @@ export const QazaCalculator: React.FC<QazaCalculatorProps> = ({
             ))}
           </div>
 
-          {/* Pace Forecast to reduce overwhelm */}
           <div className="space-y-2 pt-1">
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-1.5 text-xs font-medium text-[#1A1D1B] dark:text-[#F1F3F2]">
                 <Sparkles className="w-3.5 h-3.5 text-[#B88E44]" />
-                <span>Completion Pace Preview</span>
+                <span>{tr('Completion Pace Preview', 'पूरा होने की रफ़्तार')}</span>
               </div>
               {onOpenFinishTime && calculation.totalPrayers > 0 && (
                 <button
@@ -732,15 +729,15 @@ export const QazaCalculator: React.FC<QazaCalculatorProps> = ({
                   onClick={() => onOpenFinishTime(calculation.totalPrayers)}
                   className="text-[11px] font-medium text-[#1B4D3E] dark:text-[#7FD1B2] hover:underline whitespace-nowrap"
                 >
-                  Custom pace →
+                  {tr('Custom pace →', 'अपनी रफ़्तार चुनें →')}
                 </button>
               )}
             </div>
             <div className="grid grid-cols-3 gap-2 text-center">
               {[
-                { label: '2 / day', rate: 2 },
-                { label: '5 / day', rate: 5 },
-                { label: '10 / day', rate: 10 },
+                { label: tr('2 / day', '2 / दिन'), rate: 2 },
+                { label: tr('5 / day', '5 / दिन'), rate: 5 },
+                { label: tr('10 / day', '10 / दिन'), rate: 10 },
               ].map((pace) => (
                 <div
                   key={pace.rate}
@@ -770,8 +767,8 @@ export const QazaCalculator: React.FC<QazaCalculatorProps> = ({
               className="w-full min-h-[44px] px-4 rounded-xl bg-[#1B4D3E] dark:bg-[#2A6F5A] text-white text-xs sm:text-sm font-medium hover:bg-[#143B2F] transition-colors disabled:opacity-50"
             >
               {mode === 'onboarding'
-                ? 'Use These Estimates'
-                : 'Set as My Starting Balance'}
+                ? tr('Use These Estimates', 'यह संख्या इस्तेमाल करें')
+                : tr('Set as My Starting Balance', 'इसे शुरुआती हिसाब बनाएं')}
             </button>
 
             {mode === 'tracker' && currentPendingTotal > 0 && (
@@ -781,7 +778,10 @@ export const QazaCalculator: React.FC<QazaCalculatorProps> = ({
                 onClick={() => void handleApply('add')}
                 className="w-full min-h-[42px] px-4 rounded-xl border border-[#E5E2DC] dark:border-[#242E2A] bg-white dark:bg-[#151C19] text-xs font-medium hover:bg-[#F1EFE9] dark:hover:bg-[#1D2622] transition-colors disabled:opacity-50"
               >
-                Add to Existing Pending ({currentPendingTotal.toLocaleString()})
+                {tr(
+                  `Add to Existing Pending (${currentPendingTotal.toLocaleString()})`,
+                  `मौजूदा बाक़ी में जोड़ें (${currentPendingTotal.toLocaleString()})`
+                )}
               </button>
             )}
 
@@ -791,7 +791,7 @@ export const QazaCalculator: React.FC<QazaCalculatorProps> = ({
                 onClick={onClose}
                 className="w-full min-h-[38px] text-xs text-[#5C635E] dark:text-[#9AA59E] hover:underline"
               >
-                Close calculator
+                {tr('Close calculator', 'कैलकुलेटर बंद करें')}
               </button>
             )}
           </div>
@@ -801,10 +801,10 @@ export const QazaCalculator: React.FC<QazaCalculatorProps> = ({
       <div className="flex items-start gap-2.5 text-[11px] text-[#7A827D] leading-relaxed pt-2 border-t border-[#E5E2DC] dark:border-[#242E2A]">
         <Info className="w-4 h-4 shrink-0 mt-0.5" />
         <p>
-          This calculator provides a personal estimation across the five daily prayers (Fajr, Dhuhr,
-          Asr, Maghrib, Isha) and does not automatically include Witr. Different scholars and
-          schools of thought have specific guidance on age of obligation and makeup prayers—please
-          consult a qualified scholar for religious rulings.
+          {tr(
+            'This calculator provides a personal estimation across the five daily prayers (Fajr, Dhuhr, Asr, Maghrib, Isha) and does not automatically include Witr. Consult a qualified scholar for religious rulings.',
+            'यह कैलकुलेटर पाँच वक़्त की फ़र्ज़ नमाज़ों का अंदाज़ा लगाता है (इसमें वित्र शामिल नहीं हैं)। शरिया मसाइल के लिए किसी आलिम से मशवरा लें।'
+          )}
         </p>
       </div>
     </div>

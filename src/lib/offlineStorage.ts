@@ -2,6 +2,8 @@ import {
   PRAYERS,
   type ActivityLog,
   type DailyCheckIn,
+  type DeenDayLog,
+  type DeenTask,
   type PrayerBalance,
   type PrayerType,
   type QazaEntry,
@@ -9,6 +11,7 @@ import {
   type SyncMetadata,
   type UserProfile,
 } from '../types/qaza';
+import { createStarterDeenTasks } from './deenPresets';
 
 const GUEST_STATE_KEY = 'qazaflow_guest_snapshot_v1';
 const USER_CACHE_PREFIX = 'qazaflow_user_cache_v1_';
@@ -32,8 +35,8 @@ export function createEmptySnapshot(uid = 'guest', email = '', displayName = 'Gu
     targetCount: 2,
     focusPrayer: 'none',
     startSmallMode: true,
-    autoCarryForward: false,
-    dailyCheckInEnabled: false,
+    autoCarryForward: true,
+    dailyCheckInEnabled: true,
     remindersEnabled: false,
     reminderTime: '20:00',
     reminderAfterPrayers: [],
@@ -71,6 +74,8 @@ export function createEmptySnapshot(uid = 'guest', email = '', displayName = 'Gu
     qazaEntries: [],
     activityLogs: [],
     dailyCheckIns: {},
+    deenTasks: createStarterDeenTasks(uid),
+    deenLogs: {},
     syncMetadata,
   };
 }
@@ -201,6 +206,35 @@ export function normalizeSnapshot(raw: Partial<QazaSnapshot>, targetUid: string)
     }
   }
 
+  const deenTasks: DeenTask[] = Array.isArray(raw.deenTasks)
+    ? raw.deenTasks.map((t, idx) => ({
+        ...t,
+        userId: targetUid,
+        targetCount: Math.max(1, Math.min(10000, Math.floor(Number(t.targetCount) || 1))),
+        sortOrder: typeof t.sortOrder === 'number' ? t.sortOrder : idx,
+        isActive: typeof t.isActive === 'boolean' ? t.isActive : true,
+      }))
+    : createStarterDeenTasks(targetUid);
+
+  const deenLogs: Record<string, DeenDayLog> = {};
+  if (raw.deenLogs && typeof raw.deenLogs === 'object') {
+    for (const [dateKey, dl] of Object.entries(raw.deenLogs)) {
+      if (/^\d{4}-\d{2}-\d{2}$/.test(dateKey) && dl && typeof dl.counts === 'object') {
+        const cleanCounts: Record<string, number> = {};
+        for (const [tid, cnt] of Object.entries(dl.counts || {})) {
+          cleanCounts[tid] = Math.max(0, Math.min(100000, Math.floor(Number(cnt) || 0)));
+        }
+        deenLogs[dateKey] = {
+          userId: targetUid,
+          date: dateKey,
+          counts: cleanCounts,
+          note: dl.note,
+          updatedAtIso: dl.updatedAtIso,
+        };
+      }
+    }
+  }
+
   return {
     version: 1,
     exportedAt: raw.exportedAt || new Date().toISOString(),
@@ -209,6 +243,8 @@ export function normalizeSnapshot(raw: Partial<QazaSnapshot>, targetUid: string)
     qazaEntries,
     activityLogs,
     dailyCheckIns,
+    deenTasks,
+    deenLogs,
     syncMetadata: {
       userId: targetUid,
       lastBackupAt: raw.syncMetadata?.lastBackupAt || base.syncMetadata.lastBackupAt,

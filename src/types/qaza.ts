@@ -165,6 +165,32 @@ export interface SyncMetadata {
   version: number;
 }
 
+export type DeenCategory = 'tasbeeh' | 'quran' | 'sunnah' | 'dua' | 'charity' | 'custom';
+export type DeenFrequency = 'daily' | 'weekly';
+
+export interface DeenTask {
+  id: string;
+  userId: string;
+  title: string;
+  titleHi?: string;
+  category: DeenCategory;
+  targetCount: number;
+  unit: string;
+  frequency: DeenFrequency;
+  isActive: boolean;
+  sortOrder: number;
+  createdAtIso: string;
+  updatedAtIso: string;
+}
+
+export interface DeenDayLog {
+  userId: string;
+  date: string; // YYYY-MM-DD
+  counts: Record<string, number>;
+  note?: string;
+  updatedAtIso?: string;
+}
+
 export interface QazaSnapshot {
   version: number;
   exportedAt: string;
@@ -173,6 +199,8 @@ export interface QazaSnapshot {
   qazaEntries: QazaEntry[];
   activityLogs: ActivityLog[];
   dailyCheckIns: Record<string, DailyCheckIn>;
+  deenTasks: DeenTask[];
+  deenLogs: Record<string, DeenDayLog>;
   syncMetadata: SyncMetadata;
 }
 

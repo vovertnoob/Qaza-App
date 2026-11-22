@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
+import { LanguageProvider, useLanguage } from './context/LanguageContext';
 import { QazaProvider, useQaza } from './context/QazaContext';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { AppShell } from './components/AppShell';
 import { HomeDashboard, type NavTab } from './components/HomeDashboard';
 import { QazaTrackerView } from './components/QazaTrackerView';
+import { DeenTrackerView } from './components/DeenTrackerView';
 import { ActivityView } from './components/ActivityView';
 import { SettingsView } from './components/SettingsView';
 import { OnboardingWizard } from './components/OnboardingWizard';
@@ -11,6 +13,7 @@ import { AuthModal } from './components/AuthModal';
 
 function tabFromPath(pathname: string): NavTab {
   if (pathname.startsWith('/tracker')) return 'tracker';
+  if (pathname.startsWith('/deen')) return 'deen';
   if (pathname.startsWith('/activity')) return 'activity';
   if (pathname.startsWith('/settings')) return 'settings';
   return 'home';
@@ -22,6 +25,7 @@ function pathFromTab(tab: NavTab): string {
 
 function QazaAppContent() {
   const { authLoading, dataLoading, snapshot } = useQaza();
+  const { tr } = useLanguage();
   const [activeTab, setActiveTab] = useState<NavTab>(() =>
     tabFromPath(window.location.pathname)
   );
@@ -68,7 +72,9 @@ function QazaAppContent() {
             <div className="h-8 bg-[#F1EFE9] dark:bg-[#242E2A] rounded w-1/2" />
             <div className="h-2.5 bg-[#F1EFE9] dark:bg-[#242E2A] rounded w-full" />
           </div>
-          <p className="text-xs text-[#5C635E] dark:text-[#9AA59E]">Loading your Qaza ledger...</p>
+          <p className="text-xs text-[#5C635E] dark:text-[#9AA59E]">
+            {tr('Loading your Qaza & Deen ledger...', 'आपका क़ज़ा और दीन रिकॉर्ड लोड हो रहा है...')}
+          </p>
         </div>
       </div>
     );
@@ -96,6 +102,7 @@ function QazaAppContent() {
         {activeTab === 'tracker' && (
           <QazaTrackerView key={trackerSection} initialSection={trackerSection} />
         )}
+        {activeTab === 'deen' && <DeenTrackerView />}
         {activeTab === 'activity' && <ActivityView />}
         {activeTab === 'settings' && <SettingsView onOpenAuth={() => setAuthModalOpen(true)} />}
       </AppShell>
@@ -107,9 +114,11 @@ function QazaAppContent() {
 export default function App() {
   return (
     <ErrorBoundary>
-      <QazaProvider>
-        <QazaAppContent />
-      </QazaProvider>
+      <LanguageProvider>
+        <QazaProvider>
+          <QazaAppContent />
+        </QazaProvider>
+      </LanguageProvider>
     </ErrorBoundary>
   );
 }

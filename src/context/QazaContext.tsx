@@ -52,13 +52,21 @@ import {
   saveUserCache,
 } from '../lib/offlineStorage';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
+import { usePrayerAlarms } from '../hooks/usePrayerAlarms';
+import { useLanguage } from './LanguageContext';
+import { createStarterDeenTasks } from '../lib/deenPresets';
+import { PRAYER_LABELS_I18N } from '../lib/i18n';
+import type { PrayerTimeSettings } from '../lib/prayerTimes';
 import {
   LIMITS,
   PRAYERS,
-  PRAYER_LABELS,
   type ActivityLog,
   type DailyCheckIn,
   type DailyCheckInStatus,
+  type DeenCategory,
+  type DeenDayLog,
+  type DeenFrequency,
+  type DeenTask,
   type PrayerBalance,
   type PrayerType,
   type QazaEntry,
@@ -85,6 +93,14 @@ interface QazaContextValue {
   hasGuestImportAvailable: boolean;
   importGuestToCloud: () => Promise<void>;
   dismissGuestImport: () => void;
+
+  // Offline Prayer Times & Alarms
+  prayerSettings: PrayerTimeSettings;
+  updatePrayerSettings: (
+    updater: Partial<PrayerTimeSettings> | ((prev: PrayerTimeSettings) => PrayerTimeSettings)
+  ) => void;
+  prayerNow: Date;
+  sendTestPrayerAlarm: () => Promise<boolean>;
 
   // Auth methods
   signInWithGoogle: () => Promise<void>;
@@ -121,6 +137,26 @@ interface QazaContextValue {
   restoreFromBackup: (incoming: QazaSnapshot) => Promise<void>;
   resetAllData: () => Promise<void>;
   markManualBackup: () => Promise<void>;
+
+  // Deen / Ibadah Tracker
+  upsertDeenTask: (input: {
+    id?: string;
+    title: string;
+    titleHi?: string;
+    category: DeenCategory;
+    targetCount: number;
+    unit: string;
+    frequency: DeenFrequency;
+    isActive?: boolean;
+  }) => Promise<void>;
+  deleteDeenTask: (taskId: string) => Promise<void>;
+  logDeenProgress: (
+    dateKey: string,
+    taskId: string,
+    value: number,
+    isAbsolute?: boolean
+  ) => Promise<void>;
+  updateDeenDayNote: (dateKey: string, note: string) => Promise<void>;
 }
 
 const QazaContext = createContext<QazaContextValue | null>(null);
@@ -144,6 +180,7 @@ function clampBalance(n: number): number {
 
 export const QazaProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const isOnline = useOnlineStatus();
+  const { lang, tr } = useLanguage();
   const [user, setUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [dataLoading, setDataLoading] = useState(true);
@@ -151,6 +188,17 @@ export const QazaProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [undoToast, setUndoToast] = useState<UndoToastItem | null>(null);
   const [inAppReminder, setInAppReminder] = useState<string | null>(null);
   const [hasGuestImportAvailable, setHasGuestImportAvailable] = useState(false);
+
+  const handlePrayerAlarmBanner = useCallback((msg: string) => {
+    setInAppReminder(msg);
+  }, []);
+
+  const {
+    settings: prayerSettings,
+    updateSettings: updatePrayerSettings,
+    now: prayerNow,
+    sendTestAlarm: sendTestPrayerAlarm,
+  } = usePrayerAlarms(handlePrayerAlarmBanner, lang);
 
   const [snapshot, setSnapshot] = useState<QazaSnapshot>(() => {
     return loadGuestSnapshot() || createEmptySnapshot('guest');
@@ -327,6 +375,37 @@ export const QazaProvider: React.FC<{ children: React.ReactNode }> = ({ children
       batch.set(doc(db, 'users', uid, 'activityLogs', log.id), logDoc);
     }
 
+    const tasks = (data.deenTasks || []).slice(0, 80);
+    for (const task of tasks) {
+      const taskDoc: Record<string, unknown> = {
+        id: task.id,
+        userId: uid,
+        title: task.title.slice(0, 100),
+        category: task.category,
+        targetCount: Math.max(1, Math.min(10000, Math.floor(task.targetCount))),
+        unit: task.unit.slice(0, 30),
+        frequency: task.frequency,
+        isActive: Boolean(task.isActive),
+        sortOrder: Math.max(0, Math.min(500, Math.floor(task.sortOrder || 0))),
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      };
+      if (task.titleHi) taskDoc.titleHi = task.titleHi.slice(0, 100);
+      batch.set(doc(db, 'users', uid, 'deenTasks', task.id), taskDoc);
+    }
+
+    const deenLogEntries = Object.values(data.deenLogs || {}).slice(0, 90);
+    for (const dl of deenLogEntries) {
+      const dlDoc: Record<string, unknown> = {
+        userId: uid,
+        date: dl.date,
+        counts: dl.counts || {},
+        updatedAt: serverTimestamp(),
+      };
+      if (dl.note) dlDoc.note = sanitizeNote(dl.note);
+      batch.set(doc(db, 'users', uid, 'deenLogs', dl.date), dlDoc);
+    }
+
     try {
       await batch.commit();
     } catch (err) {
@@ -341,6 +420,8 @@ export const QazaProvider: React.FC<{ children: React.ReactNode }> = ({ children
     let unsubEntries: (() => void) | null = null;
     let unsubLogs: (() => void) | null = null;
     let unsubCheckIns: (() => void) | null = null;
+    let unsubDeenTasks: (() => void) | null = null;
+    let unsubDeenLogs: (() => void) | null = null;
     let unsubSync: (() => void) | null = null;
     let unsubInSync: (() => void) | null = null;
 
@@ -350,6 +431,8 @@ export const QazaProvider: React.FC<{ children: React.ReactNode }> = ({ children
       unsubEntries?.();
       unsubLogs?.();
       unsubCheckIns?.();
+      unsubDeenTasks?.();
+      unsubDeenLogs?.();
       unsubSync?.();
       unsubInSync?.();
       unsubProfile = null;
@@ -357,6 +440,8 @@ export const QazaProvider: React.FC<{ children: React.ReactNode }> = ({ children
       unsubEntries = null;
       unsubLogs = null;
       unsubCheckIns = null;
+      unsubDeenTasks = null;
+      unsubDeenLogs = null;
       unsubSync = null;
       unsubInSync = null;
     };
@@ -589,6 +674,101 @@ export const QazaProvider: React.FC<{ children: React.ReactNode }> = ({ children
           });
         },
         (error) => handleFirestoreError(error, OperationType.LIST, `users/${uid}/dailyCheckIns`)
+      );
+
+      unsubDeenTasks = onSnapshot(
+        query(collection(db, 'users', uid, 'deenTasks'), orderBy('sortOrder', 'asc'), limit(100)),
+        (querySnap) => {
+          if (querySnap.empty) {
+            const seedFlagKey = `qazaflow_deen_seeded_${uid}`;
+            const alreadySeeded = localStorage.getItem(seedFlagKey) === '1';
+            if (!alreadySeeded) {
+              localStorage.setItem(seedFlagKey, '1');
+              const starters = createStarterDeenTasks(uid);
+              const seedBatch = writeBatch(db);
+              for (const task of starters) {
+                const taskDoc: Record<string, unknown> = {
+                  id: task.id,
+                  userId: uid,
+                  title: task.title,
+                  category: task.category,
+                  targetCount: task.targetCount,
+                  unit: task.unit,
+                  frequency: task.frequency,
+                  isActive: task.isActive,
+                  sortOrder: task.sortOrder,
+                  createdAt: serverTimestamp(),
+                  updatedAt: serverTimestamp(),
+                };
+                if (task.titleHi) taskDoc.titleHi = task.titleHi;
+                seedBatch.set(doc(db, 'users', uid, 'deenTasks', task.id), taskDoc);
+              }
+              void seedBatch.commit().catch(() => {
+                // ignore offline deferral
+              });
+              setSnapshot((prev) => {
+                const next = { ...prev, deenTasks: starters };
+                saveUserCache(uid, next);
+                return next;
+              });
+              return;
+            }
+          }
+
+          const tasks: DeenTask[] = [];
+          querySnap.forEach((d) => {
+            const data = d.data();
+            tasks.push({
+              id: data.id || d.id,
+              userId: uid,
+              title: String(data.title || ''),
+              titleHi: typeof data.titleHi === 'string' ? data.titleHi : undefined,
+              category: data.category || 'custom',
+              targetCount: Math.max(1, Math.min(10000, Number(data.targetCount || 1))),
+              unit: String(data.unit || 'times'),
+              frequency: data.frequency === 'weekly' ? 'weekly' : 'daily',
+              isActive: typeof data.isActive === 'boolean' ? data.isActive : true,
+              sortOrder: Number(data.sortOrder || 0),
+              createdAtIso: data.createdAt?.toDate?.()?.toISOString?.() || new Date().toISOString(),
+              updatedAtIso: data.updatedAt?.toDate?.()?.toISOString?.() || new Date().toISOString(),
+            });
+          });
+          setSnapshot((prev) => {
+            const next = { ...prev, deenTasks: tasks };
+            saveUserCache(uid, next);
+            return next;
+          });
+        },
+        (error) => handleFirestoreError(error, OperationType.LIST, `users/${uid}/deenTasks`)
+      );
+
+      unsubDeenLogs = onSnapshot(
+        query(collection(db, 'users', uid, 'deenLogs'), orderBy('date', 'desc'), limit(180)),
+        (querySnap) => {
+          const logsMap: Record<string, DeenDayLog> = {};
+          querySnap.forEach((d) => {
+            const data = d.data();
+            const counts: Record<string, number> = {};
+            if (data.counts && typeof data.counts === 'object') {
+              for (const [k, v] of Object.entries(data.counts)) {
+                counts[k] = Math.max(0, Math.min(100000, Math.floor(Number(v) || 0)));
+              }
+            }
+            logsMap[d.id] = {
+              userId: uid,
+              date: data.date || d.id,
+              counts,
+              note: typeof data.note === 'string' ? data.note : undefined,
+              updatedAtIso: data.updatedAt?.toDate?.()?.toISOString?.() || new Date().toISOString(),
+            };
+          });
+          setSnapshot((prev) => {
+            const next = { ...prev, deenLogs: logsMap };
+            saveUserCache(uid, next);
+            return next;
+          });
+        },
+        (error) => handleFirestoreError(error, OperationType.LIST, `users/${uid}/deenLogs`)
       );
 
       unsubSync = onSnapshot(
@@ -963,15 +1143,16 @@ export const QazaProvider: React.FC<{ children: React.ReactNode }> = ({ children
         `users/${uid}/balances/${prayer}`
       );
 
+      const label = PRAYER_LABELS_I18N[lang][prayer];
       showUndoToast({
         logId,
-        message: `${PRAYER_LABELS[prayer]} Qaza marked completed`,
+        message: tr(`${label} Qaza marked completed`, `${label} की क़ज़ा पूरी दर्ज हुई`),
         prayerType: prayer,
         quantity: 1,
         actionType: 'completed',
       });
     },
-    [user, commitMutation, showUndoToast]
+    [user, commitMutation, showUndoToast, lang, tr]
   );
 
   const batchComplete = useCallback(
@@ -1087,15 +1268,15 @@ export const QazaProvider: React.FC<{ children: React.ReactNode }> = ({ children
       showUndoToast({
         logId,
         message: isFullDay
-          ? 'Full Qaza Day logged (5 prayers)'
-          : `Logged ${totalApplied} Qaza prayers`,
+          ? tr('Full Qaza Day logged (5 prayers)', 'पूरा क़ज़ा दिन दर्ज हुआ (5 नमाज़ें)')
+          : tr(`Logged ${totalApplied} Qaza prayers`, `${totalApplied} क़ज़ा नमाज़ें दर्ज हुईं`),
         prayerType: 'all',
         quantity: totalApplied,
         actionType: 'batch_completed',
         batchCounts: appliedCounts,
       });
     },
-    [user, commitMutation, showUndoToast]
+    [user, commitMutation, showUndoToast, tr]
   );
 
   const addMissedToInbox = useCallback(
@@ -1207,16 +1388,20 @@ export const QazaProvider: React.FC<{ children: React.ReactNode }> = ({ children
         `users/${uid}/qazaEntries/${entryId}`
       );
 
+      const label = PRAYER_LABELS_I18N[lang][prayer];
       showUndoToast({
         logId,
-        message: `Added missed ${PRAYER_LABELS[prayer]} to Qaza Inbox`,
+        message: tr(
+          `Added missed ${label} to Qaza Inbox`,
+          `छूटी हुई ${label} क़ज़ा इनबॉक्स में जुड़ी`
+        ),
         prayerType: prayer,
         quantity: 1,
         actionType: 'missed_added',
         inboxEntryId: entryId,
       });
     },
-    [user, commitMutation, showUndoToast]
+    [user, commitMutation, showUndoToast, lang, tr]
   );
 
   const completeInboxEntry = useCallback(
@@ -1309,16 +1494,20 @@ export const QazaProvider: React.FC<{ children: React.ReactNode }> = ({ children
         `users/${uid}/qazaEntries/${entryId}`
       );
 
+      const label = PRAYER_LABELS_I18N[lang][prayer];
       showUndoToast({
         logId,
-        message: `Inbox ${PRAYER_LABELS[prayer]} marked completed`,
+        message: tr(
+          `Inbox ${label} marked completed`,
+          `इनबॉक्स की ${label} पूरी दर्ज हुई`
+        ),
         prayerType: prayer,
         quantity: 1,
         actionType: 'inbox_completed',
         inboxEntryId: entryId,
       });
     },
-    [user, commitMutation, showUndoToast]
+    [user, commitMutation, showUndoToast, lang, tr]
   );
 
   const removeInboxEntry = useCallback(
@@ -1902,14 +2091,18 @@ export const QazaProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (user) {
       try {
         const batch = writeBatch(db);
-        const [entriesSnap, logsSnap, checkInsSnap] = await Promise.all([
+        const [entriesSnap, logsSnap, checkInsSnap, deenTasksSnap, deenLogsSnap] = await Promise.all([
           getDocs(collection(db, 'users', user.uid, 'qazaEntries')),
           getDocs(collection(db, 'users', user.uid, 'activityLogs')),
           getDocs(collection(db, 'users', user.uid, 'dailyCheckIns')),
+          getDocs(collection(db, 'users', user.uid, 'deenTasks')),
+          getDocs(collection(db, 'users', user.uid, 'deenLogs')),
         ]);
         entriesSnap.forEach((d) => batch.delete(d.ref));
         logsSnap.forEach((d) => batch.delete(d.ref));
         checkInsSnap.forEach((d) => batch.delete(d.ref));
+        deenTasksSnap.forEach((d) => batch.delete(d.ref));
+        deenLogsSnap.forEach((d) => batch.delete(d.ref));
         await batch.commit();
         await writeFullSnapshotToFirestore(user.uid, fresh);
       } catch (err) {
@@ -1954,6 +2147,218 @@ export const QazaProvider: React.FC<{ children: React.ReactNode }> = ({ children
     );
   }, [user, commitMutation]);
 
+  // Deen / Ibadah Tracker CRUD & Daily Progress Logging
+  const upsertDeenTask: QazaContextValue['upsertDeenTask'] = useCallback(
+    async (input) => {
+      const prev = snapshotRef.current;
+      const uid = user?.uid || 'guest';
+      const nowIso = new Date().toISOString();
+      const existing = input.id ? prev.deenTasks.find((t) => t.id === input.id) : undefined;
+      const taskId = existing ? existing.id : generateId('deen');
+
+      const cleanTitle = input.title.trim().slice(0, 100);
+      if (!cleanTitle) return;
+
+      const cleanTarget = Math.max(1, Math.min(10000, Math.floor(input.targetCount || 1)));
+      const cleanUnit = (input.unit || 'times').trim().slice(0, 30) || 'times';
+      const cleanTitleHi = input.titleHi?.trim().slice(0, 100) || undefined;
+
+      const nextTask: DeenTask = {
+        id: taskId,
+        userId: uid,
+        title: cleanTitle,
+        titleHi: cleanTitleHi,
+        category: input.category,
+        targetCount: cleanTarget,
+        unit: cleanUnit,
+        frequency: input.frequency,
+        isActive: input.isActive !== undefined ? input.isActive : (existing?.isActive ?? true),
+        sortOrder: existing ? existing.sortOrder : Math.min(500, prev.deenTasks.length),
+        createdAtIso: existing ? existing.createdAtIso : nowIso,
+        updatedAtIso: nowIso,
+      };
+
+      const nextTasks = existing
+        ? prev.deenTasks.map((t) => (t.id === taskId ? nextTask : t))
+        : [...prev.deenTasks, nextTask];
+
+      const next: QazaSnapshot = {
+        ...prev,
+        deenTasks: nextTasks,
+      };
+
+      await commitMutation(
+        next,
+        async (activeUid) => {
+          if (existing) {
+            const updateData: Record<string, unknown> = {
+              title: nextTask.title,
+              category: nextTask.category,
+              targetCount: nextTask.targetCount,
+              unit: nextTask.unit,
+              frequency: nextTask.frequency,
+              isActive: nextTask.isActive,
+              sortOrder: nextTask.sortOrder,
+              updatedAt: serverTimestamp(),
+            };
+            if (nextTask.titleHi) updateData.titleHi = nextTask.titleHi;
+            await updateDoc(doc(db, 'users', activeUid, 'deenTasks', taskId), updateData);
+          } else {
+            const createData: Record<string, unknown> = {
+              id: taskId,
+              userId: activeUid,
+              title: nextTask.title,
+              category: nextTask.category,
+              targetCount: nextTask.targetCount,
+              unit: nextTask.unit,
+              frequency: nextTask.frequency,
+              isActive: nextTask.isActive,
+              sortOrder: nextTask.sortOrder,
+              createdAt: serverTimestamp(),
+              updatedAt: serverTimestamp(),
+            };
+            if (nextTask.titleHi) createData.titleHi = nextTask.titleHi;
+            await setDoc(doc(db, 'users', activeUid, 'deenTasks', taskId), createData);
+          }
+        },
+        `users/${uid}/deenTasks/${taskId}`
+      );
+    },
+    [user, commitMutation]
+  );
+
+  const deleteDeenTask = useCallback(
+    async (taskId: string) => {
+      const prev = snapshotRef.current;
+      const uid = user?.uid || 'guest';
+      const next: QazaSnapshot = {
+        ...prev,
+        deenTasks: prev.deenTasks.filter((t) => t.id !== taskId),
+      };
+
+      await commitMutation(
+        next,
+        async (activeUid) => {
+          const batch = writeBatch(db);
+          batch.delete(doc(db, 'users', activeUid, 'deenTasks', taskId));
+          await batch.commit();
+        },
+        `users/${uid}/deenTasks/${taskId}`
+      );
+    },
+    [user, commitMutation]
+  );
+
+  const logDeenProgress = useCallback(
+    async (dateKey: string, taskId: string, value: number, isAbsolute = false) => {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) return;
+      const prev = snapshotRef.current;
+      const uid = user?.uid || 'guest';
+      const nowIso = new Date().toISOString();
+
+      const existingDay = prev.deenLogs[dateKey] || {
+        userId: uid,
+        date: dateKey,
+        counts: {},
+      };
+
+      const prevCount = existingDay.counts[taskId] || 0;
+      const rawNext = isAbsolute ? value : prevCount + value;
+      const nextCount = Math.max(0, Math.min(100000, Math.floor(rawNext)));
+
+      const nextCounts: Record<string, number> = { ...existingDay.counts };
+      if (nextCount > 0) {
+        nextCounts[taskId] = nextCount;
+      } else {
+        delete nextCounts[taskId];
+      }
+
+      // Guard max 100 keys for Firestore rule boundary
+      const trimmedKeys = Object.keys(nextCounts).slice(0, 100);
+      const boundedCounts: Record<string, number> = {};
+      for (const k of trimmedKeys) boundedCounts[k] = nextCounts[k];
+
+      const updatedDay: DeenDayLog = {
+        userId: uid,
+        date: dateKey,
+        counts: boundedCounts,
+        note: existingDay.note,
+        updatedAtIso: nowIso,
+      };
+
+      const next: QazaSnapshot = {
+        ...prev,
+        deenLogs: {
+          ...prev.deenLogs,
+          [dateKey]: updatedDay,
+        },
+      };
+
+      await commitMutation(
+        next,
+        async (activeUid) => {
+          const payload: Record<string, unknown> = {
+            userId: activeUid,
+            date: dateKey,
+            counts: boundedCounts,
+            updatedAt: serverTimestamp(),
+          };
+          if (updatedDay.note) payload.note = sanitizeNote(updatedDay.note);
+          await setDoc(doc(db, 'users', activeUid, 'deenLogs', dateKey), payload);
+        },
+        `users/${uid}/deenLogs/${dateKey}`
+      );
+    },
+    [user, commitMutation]
+  );
+
+  const updateDeenDayNote = useCallback(
+    async (dateKey: string, note: string) => {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) return;
+      const prev = snapshotRef.current;
+      const uid = user?.uid || 'guest';
+      const nowIso = new Date().toISOString();
+      const existingDay = prev.deenLogs[dateKey] || {
+        userId: uid,
+        date: dateKey,
+        counts: {},
+      };
+      const cleanNote = sanitizeNote(note);
+
+      const updatedDay: DeenDayLog = {
+        userId: uid,
+        date: dateKey,
+        counts: existingDay.counts || {},
+        note: cleanNote,
+        updatedAtIso: nowIso,
+      };
+
+      const next: QazaSnapshot = {
+        ...prev,
+        deenLogs: {
+          ...prev.deenLogs,
+          [dateKey]: updatedDay,
+        },
+      };
+
+      await commitMutation(
+        next,
+        async (activeUid) => {
+          const payload: Record<string, unknown> = {
+            userId: activeUid,
+            date: dateKey,
+            counts: updatedDay.counts,
+            updatedAt: serverTimestamp(),
+          };
+          if (cleanNote) payload.note = cleanNote;
+          await setDoc(doc(db, 'users', activeUid, 'deenLogs', dateKey), payload);
+        },
+        `users/${uid}/deenLogs/${dateKey}`
+      );
+    },
+    [user, commitMutation]
+  );
+
   const syncState: SyncState = useMemo(() => {
     if (!user) return 'local';
     if (!isOnline) return 'offline';
@@ -1976,6 +2381,10 @@ export const QazaProvider: React.FC<{ children: React.ReactNode }> = ({ children
     hasGuestImportAvailable,
     importGuestToCloud,
     dismissGuestImport,
+    prayerSettings,
+    updatePrayerSettings,
+    prayerNow,
+    sendTestPrayerAlarm,
     signInWithGoogle,
     signInWithEmail,
     signUpWithEmail,
@@ -1995,6 +2404,10 @@ export const QazaProvider: React.FC<{ children: React.ReactNode }> = ({ children
     restoreFromBackup,
     resetAllData,
     markManualBackup,
+    upsertDeenTask,
+    deleteDeenTask,
+    logDeenProgress,
+    updateDeenDayNote,
   };
 
   return <QazaContext.Provider value={value}>{children}</QazaContext.Provider>;

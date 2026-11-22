@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { CalendarCheck, CheckCircle2, Clock, Minus, Plus, Target } from 'lucide-react';
+import { useLanguage } from '../context/LanguageContext';
 import { useQaza } from '../context/QazaContext';
+import type { AppLanguage } from '../lib/i18n';
 
 interface FinishTimeCalculatorProps {
   initialBacklogOverride?: number | null;
@@ -15,7 +17,6 @@ function diffCalendarYMD(
   if (totalDays <= 0) {
     return { years: 0, months: 0, days: 0, estDate: start };
   }
-  // Safe cap for JS Date arithmetic (~150 years = 54,787 days)
   if (totalDays > 54787) {
     const years = Math.floor(totalDays / 365.25);
     const remDays = totalDays - Math.round(years * 365.25);
@@ -47,10 +48,17 @@ function diffCalendarYMD(
   };
 }
 
-export function formatReadableDuration(totalDays: number): string {
-  if (totalDays <= 0) return '0 days';
+export function formatReadableDuration(totalDays: number, lang: AppLanguage = 'en'): string {
+  if (totalDays <= 0) return lang === 'hi' ? '0 दिन' : '0 days';
   const { years, months, days } = diffCalendarYMD(new Date(), totalDays);
   const parts: string[] = [];
+  if (lang === 'hi') {
+    if (years > 0) parts.push(`${years} साल`);
+    if (months > 0) parts.push(`${months} महीने`);
+    if (days > 0 && years < 5) parts.push(`${days} दिन`);
+    if (parts.length === 0) return `${totalDays} दिन`;
+    return parts.join(', ');
+  }
   if (years > 0) parts.push(`${years} ${years === 1 ? 'year' : 'years'}`);
   if (months > 0) parts.push(`${months} ${months === 1 ? 'month' : 'months'}`);
   if (days > 0 && years < 5) parts.push(`${days} ${days === 1 ? 'day' : 'days'}`);
@@ -58,21 +66,13 @@ export function formatReadableDuration(totalDays: number): string {
   return parts.join(', ');
 }
 
-const PRESET_PACES = [
-  { rate: 1, label: '1 / day', hint: 'Gentle start' },
-  { rate: 2, label: '2 / day', hint: 'Steady' },
-  { rate: 3, label: '3 / day', hint: 'Balanced' },
-  { rate: 5, label: '5 / day', hint: '1 full Qaza day' },
-  { rate: 10, label: '10 / day', hint: '2 full Qaza days' },
-  { rate: 15, label: '15 / day', hint: 'Accelerated' },
-];
-
 export const FinishTimeCalculator: React.FC<FinishTimeCalculatorProps> = ({
   initialBacklogOverride = null,
   onClearOverride,
   onOpenEstimator,
 }) => {
   const { snapshot, updatePreferences } = useQaza();
+  const { lang, tr } = useLanguage();
 
   const currentPendingTotal = useMemo(
     () =>
@@ -124,6 +124,15 @@ export const FinishTimeCalculator: React.FC<FinishTimeCalculatorProps> = ({
   const activeBacklog =
     backlogSource === 'current' ? currentPendingTotal : customBacklog;
 
+  const presetPaces = [
+    { rate: 1, label: tr('1 / day', '1 / दिन'), hint: tr('Gentle start', 'हल्की शुरुआत') },
+    { rate: 2, label: tr('2 / day', '2 / दिन'), hint: tr('Steady', 'नियमित') },
+    { rate: 3, label: tr('3 / day', '3 / दिन'), hint: tr('Balanced', 'संतुलित') },
+    { rate: 5, label: tr('5 / day', '5 / दिन'), hint: tr('1 full Qaza day', '1 पूरा क़ज़ा दिन') },
+    { rate: 10, label: tr('10 / day', '10 / दिन'), hint: tr('2 full Qaza days', '2 पूरे क़ज़ा दिन') },
+    { rate: 15, label: tr('15 / day', '15 / दिन'), hint: tr('Accelerated', 'तेज़ रफ़्तार') },
+  ];
+
   const computePlan = (backlog: number, dailyRate: number, activeDaysPerWeek: number) => {
     if (backlog <= 0) {
       return {
@@ -131,8 +140,8 @@ export const FinishTimeCalculator: React.FC<FinishTimeCalculatorProps> = ({
         decimalYears: '0.0',
         weeklyPrayers: 0,
         monthlyPrayers: 0,
-        readable: '0 days',
-        estDateStr: 'Completed',
+        readable: tr('0 days', '0 दिन'),
+        estDateStr: tr('Completed', 'पूरा'),
       };
     }
     const safeDaily = Math.max(1, dailyRate);
@@ -145,22 +154,26 @@ export const FinishTimeCalculator: React.FC<FinishTimeCalculatorProps> = ({
 
     const { estDate } = diffCalendarYMD(new Date(), totalDays);
     const estDateStr = estDate
-      ? estDate.toLocaleDateString([], { month: 'short', year: 'numeric' })
-      : `~${Math.round(totalDays / 365.25)} yrs out`;
+      ? estDate.toLocaleDateString(lang === 'hi' ? 'hi-IN' : [], {
+          month: 'short',
+          year: 'numeric',
+        })
+      : tr(`~${Math.round(totalDays / 365.25)} yrs out`, `~${Math.round(totalDays / 365.25)} साल`);
 
     return {
       totalDays,
       decimalYears,
       weeklyPrayers,
       monthlyPrayers,
-      readable: formatReadableDuration(totalDays),
+      readable: formatReadableDuration(totalDays, lang),
       estDateStr,
     };
   };
 
   const primaryResult = useMemo(
     () => computePlan(activeBacklog, pacePerDay, daysPerWeek),
-    [activeBacklog, pacePerDay, daysPerWeek]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [activeBacklog, pacePerDay, daysPerWeek, lang]
   );
 
   const comparisonRows = useMemo(() => {
@@ -170,7 +183,8 @@ export const FinishTimeCalculator: React.FC<FinishTimeCalculatorProps> = ({
       isSelected: rate === pacePerDay,
       ...computePlan(activeBacklog, rate, daysPerWeek),
     }));
-  }, [activeBacklog, pacePerDay, daysPerWeek]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeBacklog, pacePerDay, daysPerWeek, lang]);
 
   const handleSaveAsGoal = async () => {
     const safePace = Math.max(1, Math.min(100, pacePerDay));
@@ -178,7 +192,12 @@ export const FinishTimeCalculator: React.FC<FinishTimeCalculatorProps> = ({
       targetType: 'daily',
       targetCount: safePace,
     });
-    setGoalSavedMsg(`Saved ${safePace} prayers/day as your daily goal.`);
+    setGoalSavedMsg(
+      tr(
+        `Saved ${safePace} prayers/day as your daily goal.`,
+        `रोज़ ${safePace} नमाज़ें आपका दैनिक लक्ष्य सेट हो गया।`
+      )
+    );
     window.setTimeout(() => setGoalSavedMsg(null), 4000);
   };
 
@@ -191,14 +210,18 @@ export const FinishTimeCalculator: React.FC<FinishTimeCalculatorProps> = ({
             <Clock className="w-5 h-5 text-[#1B4D3E] dark:text-[#7FD1B2]" />
           </div>
           <div>
-            <h2 className="text-lg font-semibold">Finish-Time &amp; Pace Calculator</h2>
+            <h2 className="text-lg font-semibold">
+              {tr('Finish-Time & Pace Calculator', 'क़ज़ा पूरा होने का समय कैलकुलेटर')}
+            </h2>
             <p className="text-xs text-[#5C635E] dark:text-[#9AA59E]">
-              See how many years it will take to finish your Qaza backlog based on how many prayers you do each day.
+              {tr(
+                'See how many years it will take to finish your Qaza backlog based on how many prayers you do each day.',
+                'जानें कि रोज़ कितनी क़ज़ा नमाज़ें पढ़ने पर आपका पूरा बक़ाया कितने सालों में ख़त्म होगा।'
+              )}
             </p>
           </div>
         </div>
 
-        {/* Backlog Source Switch */}
         <div className="flex items-center gap-1 p-1 rounded-xl bg-[#F8F7F4] dark:bg-[#0E1311] border border-[#E5E2DC] dark:border-[#242E2A]">
           <button
             type="button"
@@ -212,7 +235,7 @@ export const FinishTimeCalculator: React.FC<FinishTimeCalculatorProps> = ({
                 : 'text-[#5C635E] dark:text-[#9AA59E]'
             }`}
           >
-            My Pending ({currentPendingTotal.toLocaleString()})
+            {tr('My Pending', 'मेरा बाक़ी')} ({currentPendingTotal.toLocaleString()})
           </button>
           <button
             type="button"
@@ -223,16 +246,14 @@ export const FinishTimeCalculator: React.FC<FinishTimeCalculatorProps> = ({
                 : 'text-[#5C635E] dark:text-[#9AA59E]'
             }`}
           >
-            Custom Backlog
+            {tr('Custom Backlog', 'अपनी संख्या लिखें')}
           </button>
         </div>
       </div>
 
       {/* Main 2-Column Split */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Left Controls */}
         <div className="lg:col-span-6 space-y-5">
-          {/* Backlog Box */}
           <div className="p-4 rounded-xl bg-[#F8F7F4] dark:bg-[#0E1311] border border-[#E5E2DC] dark:border-[#242E2A] space-y-2.5">
             <div className="flex items-center justify-between gap-2">
               <label
@@ -240,12 +261,12 @@ export const FinishTimeCalculator: React.FC<FinishTimeCalculatorProps> = ({
                 className="text-xs font-medium text-[#5C635E] dark:text-[#9AA59E]"
               >
                 {backlogSource === 'current'
-                  ? 'Your current pending Qaza backlog'
-                  : 'Enter backlog size to test (total prayers)'}
+                  ? tr('Your current pending Qaza backlog', 'आपकी मौजूदा बाक़ी क़ज़ा नमाज़ें')
+                  : tr('Enter backlog size to test (total prayers)', 'अंदाज़न कुल बाक़ी नमाज़ें लिखें')}
               </label>
               {initialBacklogOverride && backlogSource === 'custom' && (
                 <span className="text-[11px] font-medium text-[#1B4D3E] dark:text-[#7FD1B2]">
-                  From Qaza Calculator
+                  {tr('From Qaza Calculator', 'कैलकुलेटर से')}
                 </span>
               )}
             </div>
@@ -255,7 +276,7 @@ export const FinishTimeCalculator: React.FC<FinishTimeCalculatorProps> = ({
                 <p className="text-2xl font-semibold font-mono-num">
                   {currentPendingTotal.toLocaleString()}{' '}
                   <span className="text-xs font-normal text-[#5C635E] dark:text-[#9AA59E]">
-                    prayers
+                    {tr('prayers', 'नमाज़ें')}
                   </span>
                 </p>
                 {currentPendingTotal === 0 && onOpenEstimator && (
@@ -264,7 +285,7 @@ export const FinishTimeCalculator: React.FC<FinishTimeCalculatorProps> = ({
                     onClick={onOpenEstimator}
                     className="text-xs font-medium text-[#1B4D3E] dark:text-[#7FD1B2] hover:underline whitespace-nowrap"
                   >
-                    Estimate my Qaza →
+                    {tr('Estimate my Qaza →', 'क़ज़ा का अंदाज़ा लगाएं →')}
                   </button>
                 )}
               </div>
@@ -290,21 +311,21 @@ export const FinishTimeCalculator: React.FC<FinishTimeCalculatorProps> = ({
             )}
           </div>
 
-          {/* Daily Pace Stepper & Presets */}
+          {/* Daily Pace Stepper */}
           <div className="space-y-3">
             <div className="flex items-center justify-between gap-2">
               <label
                 htmlFor="finish-daily-pace"
                 className="text-xs font-medium text-[#1A1D1B] dark:text-[#F1F3F2]"
               >
-                Qaza prayers you plan to pray each day
+                {tr('Qaza prayers you plan to pray each day', 'रोज़ आप कितनी क़ज़ा नमाज़ें पढ़ेंगे')}
               </label>
               <span className="text-[11px] text-[#7A827D] font-mono-num">
                 {pacePerDay === 5
-                  ? '1 full Qaza day / day'
+                  ? tr('1 full Qaza day / day', 'रोज़ 1 पूरा क़ज़ा दिन')
                   : pacePerDay === 10
-                    ? '2 full Qaza days / day'
-                    : `${pacePerDay} per day`}
+                    ? tr('2 full Qaza days / day', 'रोज़ 2 पूरे क़ज़ा दिन')
+                    : `${pacePerDay} ${tr('per day', 'प्रति दिन')}`}
               </span>
             </div>
 
@@ -312,7 +333,7 @@ export const FinishTimeCalculator: React.FC<FinishTimeCalculatorProps> = ({
               <button
                 type="button"
                 onClick={() => setPacePerDay((p) => Math.max(1, p - 1))}
-                aria-label="Decrease daily Qaza prayers"
+                aria-label={tr('Decrease daily Qaza prayers', 'कम करें')}
                 className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl border border-[#E5E2DC] dark:border-[#242E2A] bg-[#F8F7F4] dark:bg-[#0E1311] hover:border-[#1B4D3E] transition-colors"
               >
                 <Minus className="w-4 h-4" />
@@ -336,7 +357,7 @@ export const FinishTimeCalculator: React.FC<FinishTimeCalculatorProps> = ({
               <button
                 type="button"
                 onClick={() => setPacePerDay((p) => Math.min(100, p + 1))}
-                aria-label="Increase daily Qaza prayers"
+                aria-label={tr('Increase daily Qaza prayers', 'बढ़ाएं')}
                 className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl border border-[#E5E2DC] dark:border-[#242E2A] bg-[#F8F7F4] dark:bg-[#0E1311] hover:border-[#1B4D3E] transition-colors"
               >
                 <Plus className="w-4 h-4" />
@@ -344,7 +365,7 @@ export const FinishTimeCalculator: React.FC<FinishTimeCalculatorProps> = ({
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {PRESET_PACES.map((preset) => {
+              {presetPaces.map((preset) => {
                 const active = pacePerDay === preset.rate;
                 return (
                   <button
@@ -367,22 +388,23 @@ export const FinishTimeCalculator: React.FC<FinishTimeCalculatorProps> = ({
             </div>
           </div>
 
-          {/* Days per week consistency selector */}
           <div className="space-y-2 pt-1">
             <div className="flex items-center justify-between text-xs">
               <span className="font-medium text-[#5C635E] dark:text-[#9AA59E]">
-                How many days a week?
+                {tr('How many days a week?', 'हफ़्ते में कितने दिन पढ़ेंगे?')}
               </span>
               <span className="font-mono-num text-[#1A1D1B] dark:text-[#F1F3F2]">
-                {daysPerWeek === 7 ? 'Every day' : `${daysPerWeek} days / week`}
+                {daysPerWeek === 7
+                  ? tr('Every day', 'हर दिन')
+                  : `${daysPerWeek} ${tr('days / week', 'दिन / हफ़्ता')}`}
               </span>
             </div>
             <div className="grid grid-cols-4 gap-2">
               {[
-                { days: 7, label: '7 days' },
-                { days: 6, label: '6 days' },
-                { days: 5, label: '5 days' },
-                { days: 2, label: 'Weekends (2)' },
+                { days: 7, label: tr('7 days', '7 दिन') },
+                { days: 6, label: tr('6 days', '6 दिन') },
+                { days: 5, label: tr('5 days', '5 दिन') },
+                { days: 2, label: tr('Weekends (2)', 'वीकेंड (2)') },
               ].map((opt) => (
                 <button
                   key={opt.days}
@@ -405,47 +427,64 @@ export const FinishTimeCalculator: React.FC<FinishTimeCalculatorProps> = ({
         <div className="lg:col-span-6 rounded-2xl bg-[#F8F7F4] dark:bg-[#0E1311] border border-[#E5E2DC] dark:border-[#242E2A] p-5 space-y-5">
           {activeBacklog === 0 ? (
             <div className="py-6 text-center space-y-2">
-              <p className="text-base font-semibold">No pending backlog selected</p>
+              <p className="text-base font-semibold">
+                {tr('No pending backlog selected', 'कोई बाक़ी संख्या चुनी नहीं गई')}
+              </p>
               <p className="text-xs text-[#5C635E] dark:text-[#9AA59E]">
-                Switch to &ldquo;Custom Backlog&rdquo; above to test any number, or estimate your pending Qaza first.
+                {tr(
+                  'Switch to "Custom Backlog" above to test any number, or estimate your pending Qaza first.',
+                  'कोई भी संख्या जांचने के लिए ऊपर "अपनी संख्या लिखें" चुनें या पहले क़ज़ा का अंदाज़ा लगाएं।'
+                )}
               </p>
             </div>
           ) : (
             <>
               <div className="space-y-1.5">
                 <p className="text-xs text-[#5C635E] dark:text-[#9AA59E]">
-                  At{' '}
-                  <span className="font-semibold text-[#1A1D1B] dark:text-[#F1F3F2] font-mono-num">
-                    {pacePerDay} {pacePerDay === 1 ? 'prayer' : 'prayers'}/day
-                  </span>{' '}
-                  ({daysPerWeek === 7 ? 'every day' : `${daysPerWeek} days/week`}) for{' '}
-                  <span className="font-mono-num">{activeBacklog.toLocaleString()}</span> prayers:
+                  {lang === 'hi' ? (
+                    <>
+                      <span className="font-mono-num">{activeBacklog.toLocaleString()}</span> नमाज़ों के लिए रोज़{' '}
+                      <span className="font-semibold text-[#1A1D1B] dark:text-[#F1F3F2] font-mono-num">
+                        {pacePerDay} नमाज़/दिन
+                      </span>{' '}
+                      ({daysPerWeek === 7 ? 'रोज़ाना' : `हफ़्ते में ${daysPerWeek} दिन`}):
+                    </>
+                  ) : (
+                    <>
+                      At{' '}
+                      <span className="font-semibold text-[#1A1D1B] dark:text-[#F1F3F2] font-mono-num">
+                        {pacePerDay} {pacePerDay === 1 ? 'prayer' : 'prayers'}/day
+                      </span>{' '}
+                      ({daysPerWeek === 7 ? 'every day' : `${daysPerWeek} days/week`}) for{' '}
+                      <span className="font-mono-num">{activeBacklog.toLocaleString()}</span> prayers:
+                    </>
+                  )}
                 </p>
                 <p className="text-2xl sm:text-3xl font-semibold tracking-tight font-mono-num text-[#1B4D3E] dark:text-[#7FD1B2]">
                   {primaryResult.readable}
                 </p>
                 <p className="text-xs text-[#5C635E] dark:text-[#9AA59E] font-mono-num">
-                  ~{primaryResult.decimalYears} years · {primaryResult.totalDays.toLocaleString()}{' '}
-                  days total
+                  ~{primaryResult.decimalYears} {tr('years', 'साल')} ·{' '}
+                  {primaryResult.totalDays.toLocaleString()} {tr('days total', 'कुल दिन')}
                 </p>
               </div>
 
               <div className="grid grid-cols-3 gap-3 pt-3 border-t border-[#E5E2DC] dark:border-[#242E2A]">
                 <div>
-                  <p className="text-[11px] text-[#7A827D]">Est. Finish</p>
+                  <p className="text-[11px] text-[#7A827D]">{tr('Est. Finish', 'अंदाज़न पूरा')}</p>
                   <p className="text-sm font-semibold font-mono-num mt-0.5 flex items-center gap-1">
                     <CalendarCheck className="w-3.5 h-3.5 text-[#1B4D3E] dark:text-[#7FD1B2] shrink-0" />
                     <span>{primaryResult.estDateStr}</span>
                   </p>
                 </div>
                 <div>
-                  <p className="text-[11px] text-[#7A827D]">Per Week</p>
+                  <p className="text-[11px] text-[#7A827D]">{tr('Per Week', 'हर हफ़्ते')}</p>
                   <p className="text-sm font-semibold font-mono-num mt-0.5">
                     {primaryResult.weeklyPrayers.toLocaleString()}
                   </p>
                 </div>
                 <div>
-                  <p className="text-[11px] text-[#7A827D]">Per Month</p>
+                  <p className="text-[11px] text-[#7A827D]">{tr('Per Month', 'हर महीने')}</p>
                   <p className="text-sm font-semibold font-mono-num mt-0.5">
                     ~{primaryResult.monthlyPrayers.toLocaleString()}
                   </p>
@@ -465,22 +504,27 @@ export const FinishTimeCalculator: React.FC<FinishTimeCalculatorProps> = ({
                 className="w-full min-h-[44px] px-4 rounded-xl bg-[#1B4D3E] dark:bg-[#2A6F5A] text-white text-xs sm:text-sm font-medium hover:bg-[#143B2F] transition-colors inline-flex items-center justify-center gap-2"
               >
                 <Target className="w-4 h-4 shrink-0" />
-                <span>Set {pacePerDay} / day as My Daily Goal</span>
+                <span>
+                  {tr(
+                    `Set ${pacePerDay} / day as My Daily Goal`,
+                    `रोज़ ${pacePerDay} नमाज़ें अपना लक्ष्य सेट करें`
+                  )}
+                </span>
               </button>
             </>
           )}
         </div>
       </div>
 
-      {/* Side-by-Side Pace Comparison Table */}
+      {/* Comparison Table */}
       {activeBacklog > 0 && (
         <div className="pt-2 space-y-2.5">
           <div className="flex items-center justify-between gap-2">
             <h3 className="text-xs font-semibold text-[#1A1D1B] dark:text-[#F1F3F2]">
-              Compare Daily Paces (Tap any row to select)
+              {tr('Compare Daily Paces (Tap any row to select)', 'अलग-अलग रफ़्तार की तुलना करें (चुनने के लिए टैप करें)')}
             </h3>
             <span className="text-[11px] text-[#7A827D] font-mono-num">
-              Backlog: {activeBacklog.toLocaleString()}
+              {tr('Backlog', 'बक़ाया')}: {activeBacklog.toLocaleString()}
             </span>
           </div>
 
@@ -488,10 +532,10 @@ export const FinishTimeCalculator: React.FC<FinishTimeCalculatorProps> = ({
             <table className="w-full text-left border-collapse text-xs">
               <thead>
                 <tr className="bg-[#F8F7F4] dark:bg-[#0E1311] border-b border-[#E5E2DC] dark:border-[#242E2A] text-[#5C635E] dark:text-[#9AA59E]">
-                  <th className="py-2.5 px-3.5 font-medium">Daily Pace</th>
-                  <th className="py-2.5 px-3.5 font-medium text-right">Per Week</th>
-                  <th className="py-2.5 px-3.5 font-medium">Time to Finish</th>
-                  <th className="py-2.5 px-3.5 font-medium text-right">Est. Finish</th>
+                  <th className="py-2.5 px-3.5 font-medium">{tr('Daily Pace', 'रोज़ की गिनती')}</th>
+                  <th className="py-2.5 px-3.5 font-medium text-right">{tr('Per Week', 'हफ़्ता')}</th>
+                  <th className="py-2.5 px-3.5 font-medium">{tr('Time to Finish', 'लगने वाला समय')}</th>
+                  <th className="py-2.5 px-3.5 font-medium text-right">{tr('Est. Finish', 'पूरा होने तक')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#E5E2DC] dark:divide-[#242E2A]">
@@ -506,14 +550,18 @@ export const FinishTimeCalculator: React.FC<FinishTimeCalculatorProps> = ({
                     }`}
                   >
                     <td className="py-2.5 px-3.5 font-mono-num whitespace-nowrap">
-                      {row.rate} / day
-                      {row.rate === 5 ? ' (1 Qaza day)' : row.rate === 10 ? ' (2 Qaza days)' : ''}
+                      {row.rate} / {tr('day', 'दिन')}
+                      {row.rate === 5
+                        ? tr(' (1 Qaza day)', ' (1 क़ज़ा दिन)')
+                        : row.rate === 10
+                          ? tr(' (2 Qaza days)', ' (2 क़ज़ा दिन)')
+                          : ''}
                     </td>
                     <td className="py-2.5 px-3.5 font-mono-num text-right text-[#5C635E] dark:text-[#9AA59E]">
                       {row.weeklyPrayers.toLocaleString()}
                     </td>
                     <td className="py-2.5 px-3.5 font-mono-num text-[#1B4D3E] dark:text-[#7FD1B2]">
-                      {row.readable} ({row.decimalYears} yrs)
+                      {row.readable} ({row.decimalYears} {tr('yrs', 'साल')})
                     </td>
                     <td className="py-2.5 px-3.5 font-mono-num text-right whitespace-nowrap text-[#5C635E] dark:text-[#9AA59E]">
                       {row.estDateStr}

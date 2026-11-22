@@ -90,6 +90,17 @@ export function exportToCsv(snapshot: QazaSnapshot): void {
     );
   }
 
+  lines.push('');
+  lines.push('Deen Tasks');
+  lines.push('Title,Category,Frequency,Target,Unit,Active');
+  for (const t of snapshot.deenTasks || []) {
+    lines.push(
+      [t.title, t.category, t.frequency, t.targetCount, t.unit, t.isActive ? 'Yes' : 'No']
+        .map(escapeCsv)
+        .join(',')
+    );
+  }
+
   const dateStr = new Date().toISOString().slice(0, 10);
   downloadFile(lines.join('\n'), `qazaflow-export-${dateStr}.csv`, 'text/csv;charset=utf-8;');
 }

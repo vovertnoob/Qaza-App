@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { ArrowLeft, ArrowRight, Calculator, Check, Cloud } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Calculator, Check, Cloud, Languages } from 'lucide-react';
+import { useLanguage } from '../context/LanguageContext';
 import { useQaza } from '../context/QazaContext';
 import { QazaCalculator } from './QazaCalculator';
 import { PWAInstallButton } from './PWAInstallButton';
@@ -18,6 +19,7 @@ interface OnboardingWizardProps {
 
 export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onOpenAuth }) => {
   const { user, completeOnboarding } = useQaza();
+  const { lang, toggleLang, tr, prayerLabel, prayerHint, routineInfo } = useLanguage();
   const [step, setStep] = useState<1 | 2 | 3 | 4 | 5>(1);
   const [saving, setSaving] = useState(false);
 
@@ -100,22 +102,27 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onOpenAuth }
             <span className="font-display font-semibold text-base tracking-tight">QazaFlow</span>
           </div>
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+            <button
+              type="button"
+              onClick={toggleLang}
+              className="inline-flex items-center gap-1.5 min-h-[38px] px-2.5 rounded-xl border border-[#E5E2DC] dark:border-[#242E2A] text-xs font-medium hover:bg-[#F1EFE9] dark:hover:bg-[#1D2622] whitespace-nowrap shrink-0"
+            >
+              <Languages className="w-3.5 h-3.5 text-[#1B4D3E] dark:text-[#7FD1B2]" />
+              <span>{lang === 'en' ? 'हिंदी' : 'English'}</span>
+            </button>
             <PWAInstallButton compact />
             {!user && (
               <button
                 type="button"
                 onClick={onOpenAuth}
-                className="inline-flex items-center gap-1.5 min-h-[40px] px-2.5 sm:px-3 rounded-xl border border-[#E5E2DC] dark:border-[#242E2A] text-xs font-medium text-[#1A1D1B] dark:text-[#F1F3F2] hover:bg-[#F1EFE9] dark:hover:bg-[#1D2622] transition-colors whitespace-nowrap shrink-0"
+                className="inline-flex items-center gap-1.5 min-h-[38px] px-2.5 sm:px-3 rounded-xl border border-[#E5E2DC] dark:border-[#242E2A] text-xs font-medium text-[#1A1D1B] dark:text-[#F1F3F2] hover:bg-[#F1EFE9] dark:hover:bg-[#1D2622] transition-colors whitespace-nowrap shrink-0"
               >
                 <Cloud className="w-3.5 h-3.5 text-[#1B4D3E] dark:text-[#7FD1B2]" />
-                <span>Sign In</span>
+                <span>{tr('Sign In', 'साइन इन')}</span>
               </button>
             )}
             <span className="text-xs font-mono-num text-[#5C635E] dark:text-[#9AA59E] whitespace-nowrap">
-              <span className="hidden sm:inline">Step </span>
-              {step}
-              <span className="hidden sm:inline"> of 5</span>
-              <span className="sm:hidden">/5</span>
+              {tr(`Step ${step} of 5`, `क़दम ${step}/5`)}
             </span>
           </div>
         </div>
@@ -135,31 +142,48 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onOpenAuth }
             <div className="space-y-6">
               <div className="space-y-3">
                 <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight text-balance">
-                  Your Qaza journey, made easier.
+                  {tr('Your Qaza journey, made easier.', 'आपका क़ज़ा और दीन का सफ़र, अब आसान।')}
                 </h1>
                 <p className="text-base text-[#5C635E] dark:text-[#9AA59E] leading-relaxed max-w-xl">
-                  Keep track of your pending prayers, build a manageable routine, and see your
-                  progress over time.
+                  {tr(
+                    'Keep track of your pending prayers, build a manageable routine, and see your progress over time.',
+                    'अपनी बाक़ी क़ज़ा नमाज़ों और रोज़ाना दीन की आदतों (तस्बीह, क़ुरआन) का हिसाब बिना किसी झंझट के रखें।'
+                  )}
                 </p>
               </div>
 
               <div className="border-t border-[#E5E2DC] dark:border-[#242E2A] pt-5 grid sm:grid-cols-3 gap-4 text-sm">
                 <div>
-                  <p className="font-medium text-[#1A1D1B] dark:text-[#F1F3F2]">Know what remains</p>
+                  <p className="font-medium text-[#1A1D1B] dark:text-[#F1F3F2]">
+                    {tr('Know what remains', 'साफ़ हिसाब रखें')}
+                  </p>
                   <p className="text-xs text-[#5C635E] dark:text-[#9AA59E] mt-1">
-                    Track Fajr, Dhuhr, Asr, Maghrib, and Isha separately.
+                    {tr(
+                      'Track Fajr, Dhuhr, Asr, Maghrib, and Isha separately.',
+                      'फ़ज्र, ज़ुहर, अस्र, मग़रिब और इशा का अलग-अलग हिसाब।'
+                    )}
                   </p>
                 </div>
                 <div>
-                  <p className="font-medium text-[#1A1D1B] dark:text-[#F1F3F2]">Log it in seconds</p>
+                  <p className="font-medium text-[#1A1D1B] dark:text-[#F1F3F2]">
+                    {tr('Log it in seconds', 'कुछ सेकंड में दर्ज करें')}
+                  </p>
                   <p className="text-xs text-[#5C635E] dark:text-[#9AA59E] mt-1">
-                    One-tap completion, undo support, and offline saving.
+                    {tr(
+                      'One-tap completion, undo support, and offline saving.',
+                      'एक टैप में पूरा दर्ज करें, ऑफ़लाइन भी सेव होता है।'
+                    )}
                   </p>
                 </div>
                 <div>
-                  <p className="font-medium text-[#1A1D1B] dark:text-[#F1F3F2]">Keep moving forward</p>
+                  <p className="font-medium text-[#1A1D1B] dark:text-[#F1F3F2]">
+                    {tr('Keep moving forward', 'बिना दबाव आगे बढ़ें')}
+                  </p>
                   <p className="text-xs text-[#5C635E] dark:text-[#9AA59E] mt-1">
-                    No guilt, no streak penalties, pick up anytime.
+                    {tr(
+                      'No guilt, no streak penalties, pick up anytime.',
+                      'कोई तनाव नहीं—अपनी रफ़्तार से जब चाहें आगे बढ़ें।'
+                    )}
                   </p>
                 </div>
               </div>
@@ -170,7 +194,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onOpenAuth }
                   onClick={() => setStep(2)}
                   className="min-h-[48px] px-7 rounded-xl bg-[#1B4D3E] dark:bg-[#2A6F5A] text-white text-sm font-medium hover:bg-[#143B2F] transition-colors inline-flex items-center gap-2"
                 >
-                  <span>Get Started</span>
+                  <span>{tr('Get Started', 'शुरू करें')}</span>
                   <ArrowRight className="w-4 h-4" />
                 </button>
                 {!user && (
@@ -179,7 +203,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onOpenAuth }
                     onClick={onOpenAuth}
                     className="text-sm text-[#5C635E] dark:text-[#9AA59E] hover:text-[#1A1D1B] dark:hover:text-[#F1F3F2] underline-offset-4 hover:underline"
                   >
-                    Already have an account? Sign in
+                    {tr('Already have an account? Sign in', 'पहले से खाता है? साइन इन करें')}
                   </button>
                 )}
               </div>
@@ -191,11 +215,13 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onOpenAuth }
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="space-y-1.5">
                   <h2 className="text-2xl font-semibold tracking-tight">
-                    Estimate your starting Qaza balance
+                    {tr('Estimate your starting Qaza balance', 'अपनी शुरुआती क़ज़ा नमाज़ों का अंदाज़ा लिखें')}
                   </h2>
                   <p className="text-sm text-[#5C635E] dark:text-[#9AA59E]">
-                    Enter an estimate, calculate by age, or skip for now. You can edit any balance
-                    anytime in Settings.
+                    {tr(
+                      'Enter an estimate, calculate by age, or skip for now. You can edit any balance anytime in Settings.',
+                      'संख्या लिखें, उम्र से कैलकुलेट करें या अभी छोड़ दें। बाद में सेटिंग्स से कभी भी बदल सकते हैं।'
+                    )}
                   </p>
                 </div>
                 <button
@@ -204,7 +230,11 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onOpenAuth }
                   className="min-h-[40px] px-3.5 rounded-xl border border-[#1B4D3E]/30 dark:border-[#2A6F5A]/50 bg-[#1B4D3E]/8 dark:bg-[#2A6F5A]/15 text-[#1B4D3E] dark:text-[#7FD1B2] text-xs font-medium inline-flex items-center gap-1.5 whitespace-nowrap shrink-0"
                 >
                   <Calculator className="w-4 h-4" />
-                  <span>{showCalculator ? 'Hide Calculator' : 'Calculate by Age'}</span>
+                  <span>
+                    {showCalculator
+                      ? tr('Hide Calculator', 'कैलकुलेटर छुपाएं')
+                      : tr('Calculate by Age', 'उम्र से हिसाब लगाएं')}
+                  </span>
                 </button>
               </div>
 
@@ -227,10 +257,10 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onOpenAuth }
                     htmlFor="apply-all-input"
                     className="text-sm font-medium text-[#1A1D1B] dark:text-[#F1F3F2]"
                   >
-                    Apply the same estimate to all five
+                    {tr('Apply the same estimate to all five', 'पांचों नमाज़ों में एक जैसी संख्या भरें')}
                   </label>
                   <p className="text-xs text-[#5C635E] dark:text-[#9AA59E]">
-                    For example, 365 for roughly one year of prayers.
+                    {tr('For example, 365 for roughly one year of prayers.', 'उदाहरण के लिए लगभग 1 साल के लिए 365 लिखें।')}
                   </p>
                 </div>
                 <input
@@ -252,14 +282,14 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onOpenAuth }
                     className="flex items-center justify-between px-4 py-3 bg-white dark:bg-[#151C19]"
                   >
                     <div>
-                      <span className="text-sm font-medium">{p.label}</span>
-                      <span className="ml-2 text-xs text-[#7A827D]">{p.timeHint}</span>
+                      <span className="text-sm font-medium">{prayerLabel(p.id)}</span>
+                      <span className="ml-2 text-xs text-[#7A827D]">{prayerHint(p.id)}</span>
                     </div>
                     <input
                       type="number"
                       min={0}
                       max={1000000}
-                      aria-label={`${p.label} initial pending balance`}
+                      aria-label={`${prayerLabel(p.id)} balance`}
                       value={balances[p.id] === 0 ? '' : balances[p.id]}
                       placeholder="0"
                       onChange={(e) => {
@@ -273,9 +303,9 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onOpenAuth }
               </div>
 
               <div className="flex items-center justify-between text-xs text-[#5C635E] dark:text-[#9AA59E]">
-                <span>Total starting estimate</span>
+                <span>{tr('Total starting estimate', 'कुल शुरुआती संख्या')}</span>
                 <span className="font-mono-num text-sm font-semibold text-[#1A1D1B] dark:text-[#F1F3F2]">
-                  {totalPending.toLocaleString()} prayers
+                  {totalPending.toLocaleString()} {tr('prayers', 'नमाज़ें')}
                 </span>
               </div>
 
@@ -286,7 +316,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onOpenAuth }
                   className="min-h-[44px] px-4 rounded-xl border border-[#E5E2DC] dark:border-[#242E2A] text-sm font-medium hover:bg-[#F1EFE9] dark:hover:bg-[#1D2622] inline-flex items-center gap-2"
                 >
                   <ArrowLeft className="w-4 h-4" />
-                  <span>Back</span>
+                  <span>{tr('Back', 'पीछे')}</span>
                 </button>
                 <div className="flex items-center gap-3">
                   <button
@@ -297,14 +327,14 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onOpenAuth }
                     }}
                     className="min-h-[44px] px-4 rounded-xl text-sm text-[#5C635E] dark:text-[#9AA59E] hover:text-[#1A1D1B] dark:hover:text-[#F1F3F2]"
                   >
-                    Skip calculation
+                    {tr('Skip calculation', 'अभी छोड़ें')}
                   </button>
                   <button
                     type="button"
                     onClick={() => setStep(3)}
                     className="min-h-[44px] px-6 rounded-xl bg-[#1B4D3E] dark:bg-[#2A6F5A] text-white text-sm font-medium hover:bg-[#143B2F] inline-flex items-center gap-2"
                   >
-                    <span>Continue</span>
+                    <span>{tr('Continue', 'आगे बढ़ें')}</span>
                     <ArrowRight className="w-4 h-4" />
                   </button>
                 </div>
@@ -316,17 +346,20 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onOpenAuth }
             <div className="space-y-6">
               <div className="space-y-2">
                 <h2 className="text-2xl font-semibold tracking-tight">
-                  Choose a tracking routine
+                  {tr('Choose a tracking routine', 'पढ़ने का तरीक़ा चुनें')}
                 </h2>
                 <p className="text-sm text-[#5C635E] dark:text-[#9AA59E]">
-                  Pick a rhythm that feels sustainable. These are personal tracking preferences, not
-                  religious rulings, and you can switch anytime.
+                  {tr(
+                    'Pick a rhythm that feels sustainable. These are personal tracking preferences, not religious rulings, and you can switch anytime.',
+                    'जो तरीक़ा आपको आसान लगे उसे चुनें। आप इसे कभी भी बदल सकते हैं।'
+                  )}
                 </p>
               </div>
 
               <div className="space-y-2.5">
                 {ROUTINE_OPTIONS.map((opt) => {
                   const selected = routine === opt.id;
+                  const info = routineInfo(opt.id);
                   return (
                     <button
                       key={opt.id}
@@ -340,10 +373,10 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onOpenAuth }
                     >
                       <div>
                         <p className="text-sm font-medium text-[#1A1D1B] dark:text-[#F1F3F2]">
-                          {opt.title}
+                          {info.title}
                         </p>
                         <p className="text-xs text-[#5C635E] dark:text-[#9AA59E] mt-0.5">
-                          {opt.description}
+                          {info.description}
                         </p>
                       </div>
                       <span
@@ -363,7 +396,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onOpenAuth }
               {routine === 'one_prayer_at_a_time' && (
                 <div className="p-4 rounded-xl bg-[#F8F7F4] dark:bg-[#0E1311] border border-[#E5E2DC] dark:border-[#242E2A] space-y-2.5">
                   <label className="block text-xs font-medium text-[#5C635E] dark:text-[#9AA59E]">
-                    Which prayer would you like to focus on first?
+                    {tr('Which prayer would you like to focus on first?', 'पहले किस नमाज़ से शुरुआत करेंगे?')}
                   </label>
                   <div className="flex flex-wrap gap-2">
                     {PRAYERS.map((p) => (
@@ -377,7 +410,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onOpenAuth }
                             : 'bg-white dark:bg-[#151C19] border-[#E5E2DC] dark:border-[#242E2A] text-[#1A1D1B] dark:text-[#F1F3F2]'
                         }`}
                       >
-                        {p.label}
+                        {prayerLabel(p.id)}
                       </button>
                     ))}
                   </div>
@@ -391,14 +424,14 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onOpenAuth }
                   className="min-h-[44px] px-4 rounded-xl border border-[#E5E2DC] dark:border-[#242E2A] text-sm font-medium hover:bg-[#F1EFE9] dark:hover:bg-[#1D2622] inline-flex items-center gap-2"
                 >
                   <ArrowLeft className="w-4 h-4" />
-                  <span>Back</span>
+                  <span>{tr('Back', 'पीछे')}</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setStep(4)}
                   className="min-h-[44px] px-6 rounded-xl bg-[#1B4D3E] dark:bg-[#2A6F5A] text-white text-sm font-medium hover:bg-[#143B2F] inline-flex items-center gap-2"
                 >
-                  <span>Continue</span>
+                  <span>{tr('Continue', 'आगे बढ़ें')}</span>
                   <ArrowRight className="w-4 h-4" />
                 </button>
               </div>
@@ -408,20 +441,44 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onOpenAuth }
           {step === 4 && (
             <div className="space-y-6">
               <div className="space-y-2">
-                <h2 className="text-2xl font-semibold tracking-tight">Set a gentle target</h2>
+                <h2 className="text-2xl font-semibold tracking-tight">
+                  {tr('Set a gentle target', 'रोज़ाना या हफ़्तावार आसान लक्ष्य चुनें')}
+                </h2>
                 <p className="text-sm text-[#5C635E] dark:text-[#9AA59E]">
-                  Start small so the habit stays light. You can skip setting a target or adjust it
-                  anytime.
+                  {tr(
+                    'Start small so the habit stays light. You can skip setting a target or adjust it anytime.',
+                    'छोटी शुरुआत करें ताकि आदत बनी रहे। आप इसे कभी भी बदल सकते हैं।'
+                  )}
                 </p>
               </div>
 
               <div className="grid sm:grid-cols-2 gap-2.5">
                 {[
-                  { id: '1_day', label: '1 Qaza per day', sub: 'Start Small · Gentle pace' },
-                  { id: '2_day', label: '2 Qaza per day', sub: 'Steady daily rhythm' },
-                  { id: '5_day', label: '5 Qaza per day', sub: '1 full Qaza day daily' },
-                  { id: '1_full_week', label: '1 full Qaza day per week', sub: '5 prayers weekly' },
-                  { id: 'custom', label: 'Custom target', sub: 'Choose daily or weekly count' },
+                  {
+                    id: '1_day',
+                    label: tr('1 Qaza per day', 'रोज़ 1 क़ज़ा नमाज़'),
+                    sub: tr('Start Small · Gentle pace', 'आसान और हल्की शुरुआत'),
+                  },
+                  {
+                    id: '2_day',
+                    label: tr('2 Qaza per day', 'रोज़ 2 क़ज़ा नमाज़ें'),
+                    sub: tr('Steady daily rhythm', 'नियमित रोज़ाना रफ़्तार'),
+                  },
+                  {
+                    id: '5_day',
+                    label: tr('5 Qaza per day', 'रोज़ 5 क़ज़ा नमाज़ें'),
+                    sub: tr('1 full Qaza day daily', 'रोज़ 1 पूरा क़ज़ा दिन'),
+                  },
+                  {
+                    id: '1_full_week',
+                    label: tr('1 full Qaza day per week', 'हफ़्ते में 1 पूरा क़ज़ा दिन'),
+                    sub: tr('5 prayers weekly', 'हफ़्ते में 5 नमाज़ें'),
+                  },
+                  {
+                    id: 'custom',
+                    label: tr('Custom target', 'अपना लक्ष्य लिखें'),
+                    sub: tr('Choose daily or weekly count', 'रोज़ या हफ़्ते की गिनती चुनें'),
+                  },
                 ].map((opt) => {
                   const selected = targetPreset === opt.id;
                   return (
@@ -461,7 +518,9 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onOpenAuth }
                     }}
                     className="w-24 min-h-[42px] px-3 rounded-lg border border-[#E5E2DC] dark:border-[#242E2A] bg-white dark:bg-[#151C19] font-mono-num text-sm"
                   />
-                  <span className="text-sm text-[#5C635E] dark:text-[#9AA59E]">prayers per</span>
+                  <span className="text-sm text-[#5C635E] dark:text-[#9AA59E]">
+                    {tr('prayers per', 'नमाज़ें प्रति')}
+                  </span>
                   <div className="flex rounded-lg bg-white dark:bg-[#151C19] border border-[#E5E2DC] dark:border-[#242E2A] p-1">
                     {(['daily', 'weekly'] as const).map((t) => (
                       <button
@@ -474,7 +533,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onOpenAuth }
                             : 'text-[#5C635E] dark:text-[#9AA59E]'
                         }`}
                       >
-                        {t}
+                        {t === 'daily' ? tr('daily', 'दिन') : tr('weekly', 'हफ़्ता')}
                       </button>
                     ))}
                   </div>
@@ -488,7 +547,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onOpenAuth }
                   className="min-h-[44px] px-4 rounded-xl border border-[#E5E2DC] dark:border-[#242E2A] text-sm font-medium hover:bg-[#F1EFE9] dark:hover:bg-[#1D2622] inline-flex items-center gap-2"
                 >
                   <ArrowLeft className="w-4 h-4" />
-                  <span>Back</span>
+                  <span>{tr('Back', 'पीछे')}</span>
                 </button>
                 <div className="flex items-center gap-3">
                   <button
@@ -499,14 +558,14 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onOpenAuth }
                     }}
                     className="min-h-[44px] px-4 rounded-xl text-sm text-[#5C635E] dark:text-[#9AA59E] hover:text-[#1A1D1B]"
                   >
-                    Skip for now
+                    {tr('Skip for now', 'अभी छोड़ें')}
                   </button>
                   <button
                     type="button"
                     onClick={() => setStep(5)}
                     className="min-h-[44px] px-6 rounded-xl bg-[#1B4D3E] dark:bg-[#2A6F5A] text-white text-sm font-medium hover:bg-[#143B2F] inline-flex items-center gap-2"
                   >
-                    <span>Continue</span>
+                    <span>{tr('Continue', 'आगे बढ़ें')}</span>
                     <ArrowRight className="w-4 h-4" />
                   </button>
                 </div>
@@ -518,32 +577,43 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onOpenAuth }
             <div className="space-y-6">
               <div className="space-y-2">
                 <h2 className="text-2xl font-semibold tracking-tight">
-                  Ready to start tracking
+                  {tr('Ready to start tracking', 'सब तैयार है')}
                 </h2>
                 <p className="text-sm text-[#5C635E] dark:text-[#9AA59E]">
-                  Here is your starting setup. Everything saves automatically and works even offline.
+                  {tr(
+                    'Here is your starting setup. Everything saves automatically and works even offline.',
+                    'आपकी शुरुआती जानकारी नीचे है। सब कुछ अपने आप और ऑफ़लाइन भी सेव होता है।'
+                  )}
                 </p>
               </div>
 
               <div className="rounded-xl border border-[#E5E2DC] dark:border-[#242E2A] bg-[#F8F7F4] dark:bg-[#0E1311] divide-y divide-[#E5E2DC] dark:divide-[#242E2A]">
                 <div className="p-4 flex items-center justify-between text-sm">
-                  <span className="text-[#5C635E] dark:text-[#9AA59E]">Starting Balance</span>
+                  <span className="text-[#5C635E] dark:text-[#9AA59E]">
+                    {tr('Starting Balance', 'शुरुआती हिसाब')}
+                  </span>
                   <span className="font-mono-num font-semibold">
-                    {totalPending.toLocaleString()} prayers
+                    {totalPending.toLocaleString()} {tr('prayers', 'नमाज़ें')}
                   </span>
                 </div>
                 <div className="p-4 flex items-center justify-between text-sm">
-                  <span className="text-[#5C635E] dark:text-[#9AA59E]">Tracking Routine</span>
-                  <span className="font-medium">
-                    {ROUTINE_OPTIONS.find((r) => r.id === routine)?.title}
+                  <span className="text-[#5C635E] dark:text-[#9AA59E]">
+                    {tr('Tracking Routine', 'पढ़ने का तरीक़ा')}
                   </span>
+                  <span className="font-medium">{routineInfo(routine).title}</span>
                 </div>
                 <div className="p-4 flex items-center justify-between text-sm">
-                  <span className="text-[#5C635E] dark:text-[#9AA59E]">Target Pace</span>
+                  <span className="text-[#5C635E] dark:text-[#9AA59E]">
+                    {tr('Target Pace', 'लक्ष्य')}
+                  </span>
                   <span className="font-mono-num font-medium">
                     {resolveTarget().targetType === 'none'
-                      ? 'Flexible (no fixed target)'
-                      : `${resolveTarget().targetCount} ${resolveTarget().targetType}`}
+                      ? tr('Flexible (no fixed target)', 'बिना तय लक्ष्य')
+                      : `${resolveTarget().targetCount} / ${
+                          resolveTarget().targetType === 'daily'
+                            ? tr('day', 'दिन')
+                            : tr('week', 'हफ़्ता')
+                        }`}
                   </span>
                 </div>
               </div>
@@ -551,15 +621,17 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onOpenAuth }
               {!user && (
                 <div className="p-4 rounded-xl border border-[#B88E44]/35 bg-[#B88E44]/8 text-xs text-[#5C635E] dark:text-[#C7B99B] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <span>
-                    You are currently in Local Guest mode. Sign in anytime to enable automatic cloud
-                    backup across devices.
+                    {tr(
+                      'You are currently in Local Guest mode. Sign in anytime to enable automatic cloud backup across devices.',
+                      'अभी आपका डेटा इसी डिवाइस पर सेव हो रहा है। दूसरे फ़ोन में सिंक के लिए कभी भी साइन इन करें।'
+                    )}
                   </span>
                   <button
                     type="button"
                     onClick={onOpenAuth}
                     className="font-medium text-[#1B4D3E] dark:text-[#7FD1B2] underline whitespace-nowrap shrink-0"
                   >
-                    Sign in now
+                    {tr('Sign in now', 'अभी साइन इन करें')}
                   </button>
                 </div>
               )}
@@ -571,7 +643,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onOpenAuth }
                   className="min-h-[44px] px-4 rounded-xl border border-[#E5E2DC] dark:border-[#242E2A] text-sm font-medium hover:bg-[#F1EFE9] dark:hover:bg-[#1D2622] inline-flex items-center gap-2"
                 >
                   <ArrowLeft className="w-4 h-4" />
-                  <span>Back</span>
+                  <span>{tr('Back', 'पीछे')}</span>
                 </button>
                 <button
                   type="button"
@@ -579,7 +651,11 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onOpenAuth }
                   onClick={() => void handleFinish()}
                   className="min-h-[48px] px-7 rounded-xl bg-[#1B4D3E] dark:bg-[#2A6F5A] text-white text-sm font-medium hover:bg-[#143B2F] transition-colors inline-flex items-center gap-2 disabled:opacity-60"
                 >
-                  <span>{saving ? 'Setting up...' : 'Go to Home Dashboard'}</span>
+                  <span>
+                    {saving
+                      ? tr('Setting up...', 'तैयार हो रहा है...')
+                      : tr('Go to Home Dashboard', 'होम डैशबोर्ड पर जाएं')}
+                  </span>
                   <ArrowRight className="w-4 h-4" />
                 </button>
               </div>

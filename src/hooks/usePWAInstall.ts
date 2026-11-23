@@ -10,16 +10,45 @@ export function usePWAInstall() {
   const [isInstalled, setIsInstalled] = useState(false);
   const [isIOS, setIsIOS] = useState(false);
   const [isAndroid, setIsAndroid] = useState(false);
+  const [isSafari, setIsSafari] = useState(false);
+  const [isMacSafari, setIsMacSafari] = useState(false);
+  const [isIOSInAppBrowser, setIsIOSInAppBrowser] = useState(false);
+  const [canShare, setCanShare] = useState(false);
 
   useEffect(() => {
-    const isStandalone =
-      window.matchMedia('(display-mode: standalone)').matches ||
-      (window.navigator as unknown as { standalone?: boolean }).standalone === true;
-    setIsInstalled(isStandalone);
+    const checkStandalone = () => {
+      const standaloneMatch = window.matchMedia('(display-mode: standalone)').matches;
+      const iosStandalone =
+        (window.navigator as unknown as { standalone?: boolean }).standalone === true;
+      setIsInstalled(standaloneMatch || iosStandalone);
+    };
+
+    checkStandalone();
 
     const ua = window.navigator.userAgent.toLowerCase();
-    setIsIOS(/iphone|ipad|ipod/.test(ua));
-    setIsAndroid(/android/.test(ua));
+    const platform = (window.navigator.platform || '').toLowerCase();
+    const touchPoints = window.navigator.maxTouchPoints || 0;
+
+    // Detect iPhone, iPad, iPod, and iPadOS / iPhone Safari with "Request Desktop Website"
+    const iosDevice =
+      /iphone|ipad|ipod/.test(ua) || (platform.includes('mac') && touchPoints > 1);
+    const androidDevice = /android/.test(ua);
+    const safariBrowser =
+      /safari/.test(ua) && !/chrome|crios|fxios|edgios|opios|android/.test(ua);
+    const macSafari = !iosDevice && !androidDevice && /macintosh/.test(ua) && safariBrowser;
+    const inAppBrowser =
+      iosDevice && /fban|fbav|instagram|whatsapp|line\/|micromessenger|gsa\//.test(ua);
+
+    setIsIOS(iosDevice);
+    setIsAndroid(androidDevice);
+    setIsSafari(safariBrowser);
+    setIsMacSafari(macSafari);
+    setIsIOSInAppBrowser(inAppBrowser);
+    setCanShare(typeof navigator !== 'undefined' && typeof navigator.share === 'function');
+
+    const mediaQuery = window.matchMedia('(display-mode: standalone)');
+    const handleMediaChange = () => checkStandalone();
+    mediaQuery.addEventListener?.('change', handleMediaChange);
 
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault();
@@ -35,6 +64,7 @@ export function usePWAInstall() {
     window.addEventListener('appinstalled', handleAppInstalled);
 
     return () => {
+      mediaQuery.removeEventListener?.('change', handleMediaChange);
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
       window.removeEventListener('appinstalled', handleAppInstalled);
     };
@@ -57,6 +87,10 @@ export function usePWAInstall() {
     isInstalled,
     isIOS,
     isAndroid,
+    isSafari,
+    isMacSafari,
+    isIOSInAppBrowser,
+    canShare,
     install,
   };
 }

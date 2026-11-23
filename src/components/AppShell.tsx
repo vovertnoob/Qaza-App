@@ -173,17 +173,17 @@ export const AppShell: React.FC<AppShellProps> = ({
       {/* Main Viewport */}
       <div className="flex-1 md:pl-64 lg:pl-72 flex flex-col min-w-0">
         {/* Compact Top Header */}
-        <header className="sticky top-0 z-20 h-[52px] md:h-16 bg-[#F8F7F4]/90 dark:bg-[#0E1311]/90 backdrop-blur-md border-b border-[#E5E2DC] dark:border-[#242E2A] px-4 sm:px-8 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5 min-w-0">
+        <header className="sticky top-0 z-20 h-[52px] md:h-16 bg-[#F8F7F4]/90 dark:bg-[#0E1311]/90 backdrop-blur-md border-b border-[#E5E2DC] dark:border-[#242E2A] px-3 sm:px-8 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0 flex-1">
             <img src="/icon.svg" alt="" className="w-6 h-6 rounded-md md:hidden shrink-0" />
-            <h1 className="text-base sm:text-lg font-semibold tracking-tight truncate">
+            <h1 className="text-sm sm:text-lg font-semibold tracking-tight truncate">
               {pageTitle}
             </h1>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             {!isOnline && (
-              <span className="inline-flex items-center gap-1.5 text-xs font-medium text-[#B88E44] dark:text-[#D4AA5E] whitespace-nowrap">
+              <span className="inline-flex items-center gap-1 text-xs font-medium text-[#B88E44] dark:text-[#D4AA5E] whitespace-nowrap">
                 <CloudOff className="w-3.5 h-3.5" />
                 <span className="hidden sm:inline">{tr('Offline', 'ऑफ़लाइन')}</span>
               </span>
@@ -193,21 +193,22 @@ export const AppShell: React.FC<AppShellProps> = ({
               type="button"
               onClick={toggleLang}
               aria-label={tr('Switch to Hindi', 'Switch to English')}
-              className="min-h-[36px] px-2.5 rounded-lg border border-[#E5E2DC] dark:border-[#242E2A] bg-white dark:bg-[#151C19] text-xs font-medium inline-flex items-center gap-1.5 whitespace-nowrap"
+              className="min-h-[36px] px-2 sm:px-2.5 rounded-lg border border-[#E5E2DC] dark:border-[#242E2A] bg-white dark:bg-[#151C19] text-xs font-medium inline-flex items-center gap-1 whitespace-nowrap"
             >
-              <Languages className="w-3.5 h-3.5 text-[#1B4D3E] dark:text-[#7FD1B2]" />
-              <span>{lang === 'en' ? 'हिंदी' : 'English'}</span>
+              <Languages className="w-3.5 h-3.5 text-[#1B4D3E] dark:text-[#7FD1B2] shrink-0" />
+              <span className="sm:hidden">{lang === 'en' ? 'हिंदी' : 'EN'}</span>
+              <span className="hidden sm:inline">{lang === 'en' ? 'हिंदी' : 'English'}</span>
             </button>
 
             <div className="md:hidden">
-              <PWAInstallButton compact />
+              <PWAInstallButton variant="compact" />
             </div>
 
             {!user && (
               <button
                 type="button"
                 onClick={onOpenAuth}
-                className="md:hidden min-h-[36px] px-2.5 rounded-lg border border-[#E5E2DC] dark:border-[#242E2A] bg-white dark:bg-[#151C19] text-xs font-medium whitespace-nowrap"
+                className="md:hidden min-h-[36px] px-2 sm:px-2.5 rounded-lg border border-[#E5E2DC] dark:border-[#242E2A] bg-white dark:bg-[#151C19] text-xs font-medium whitespace-nowrap"
               >
                 {tr('Sign In', 'साइन इन')}
               </button>
@@ -287,7 +288,7 @@ export const AppShell: React.FC<AppShellProps> = ({
       {/* Mobile Bottom Navigation */}
       <nav
         aria-label={tr('Mobile navigation', 'मोबाइल नेविगेशन')}
-        className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-[#151C19]/95 backdrop-blur-md border-t border-[#E5E2DC] dark:border-[#242E2A] grid grid-cols-5 h-16 pb-safe"
+        className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-[#151C19]/95 backdrop-blur-md border-t border-[#E5E2DC] dark:border-[#242E2A] grid grid-cols-5 min-h-16 pt-1 pb-safe"
       >
         {navItems.map(({ id, shortLabel, Icon }) => {
           const active = activeTab === id;

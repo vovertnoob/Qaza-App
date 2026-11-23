@@ -17,6 +17,7 @@ import { getLocalDateKey } from '../lib/offlineStorage';
 import { calculatePrayerWindows } from '../lib/prayerTimes';
 import { PRAYERS, type PrayerType } from '../types/qaza';
 import { PrayerTimesCard } from './PrayerTimesCard';
+import { PWAInstallButton } from './PWAInstallButton';
 
 export type NavTab = 'home' | 'tracker' | 'deen' | 'activity' | 'settings';
 
@@ -194,6 +195,8 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
 
   return (
     <div className="space-y-6 pb-8">
+      <PWAInstallButton variant="banner" />
+
       {/* Top Overview Grid */}
       <section className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
         {/* Primary Overall Balance Card */}

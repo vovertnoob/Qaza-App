@@ -96,39 +96,49 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onOpenAuth }
   return (
     <div className="min-h-screen bg-[#F8F7F4] dark:bg-[#0E1311] text-[#1A1D1B] dark:text-[#F1F3F2] flex flex-col">
       <header className="w-full border-b border-[#E5E2DC] dark:border-[#242E2A] bg-white/80 dark:bg-[#151C19]/80 backdrop-blur-md">
-        <div className="max-w-3xl mx-auto px-4 sm:px-5 h-16 flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2 shrink-0">
-            <img src="/icon.svg" alt="" className="w-7 h-7 rounded-lg" />
-            <span className="font-display font-semibold text-base tracking-tight">QazaFlow</span>
+        <div className="max-w-3xl mx-auto px-3 sm:px-5 h-16 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <img src="/icon.svg" alt="" className="w-7 h-7 rounded-lg shrink-0" />
+            <span className="font-display font-semibold text-sm sm:text-base tracking-tight truncate">
+              QazaFlow
+            </span>
           </div>
-          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+          <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
             <button
               type="button"
               onClick={toggleLang}
-              className="inline-flex items-center gap-1.5 min-h-[38px] px-2.5 rounded-xl border border-[#E5E2DC] dark:border-[#242E2A] text-xs font-medium hover:bg-[#F1EFE9] dark:hover:bg-[#1D2622] whitespace-nowrap shrink-0"
+              className="inline-flex items-center gap-1 min-h-[36px] px-2 sm:px-2.5 rounded-xl border border-[#E5E2DC] dark:border-[#242E2A] text-xs font-medium hover:bg-[#F1EFE9] dark:hover:bg-[#1D2622] whitespace-nowrap shrink-0"
             >
               <Languages className="w-3.5 h-3.5 text-[#1B4D3E] dark:text-[#7FD1B2]" />
-              <span>{lang === 'en' ? 'हिंदी' : 'English'}</span>
+              <span className="sm:hidden">{lang === 'en' ? 'हिंदी' : 'EN'}</span>
+              <span className="hidden sm:inline">{lang === 'en' ? 'हिंदी' : 'English'}</span>
             </button>
-            <PWAInstallButton compact />
+            <PWAInstallButton variant="compact" />
             {!user && (
               <button
                 type="button"
                 onClick={onOpenAuth}
-                className="inline-flex items-center gap-1.5 min-h-[38px] px-2.5 sm:px-3 rounded-xl border border-[#E5E2DC] dark:border-[#242E2A] text-xs font-medium text-[#1A1D1B] dark:text-[#F1F3F2] hover:bg-[#F1EFE9] dark:hover:bg-[#1D2622] transition-colors whitespace-nowrap shrink-0"
+                aria-label={tr('Sign In', 'साइन इन')}
+                className="inline-flex items-center gap-1.5 min-h-[36px] px-2 sm:px-3 rounded-xl border border-[#E5E2DC] dark:border-[#242E2A] text-xs font-medium text-[#1A1D1B] dark:text-[#F1F3F2] hover:bg-[#F1EFE9] dark:hover:bg-[#1D2622] transition-colors whitespace-nowrap shrink-0"
               >
                 <Cloud className="w-3.5 h-3.5 text-[#1B4D3E] dark:text-[#7FD1B2]" />
-                <span>{tr('Sign In', 'साइन इन')}</span>
+                <span className="hidden sm:inline">{tr('Sign In', 'साइन इन')}</span>
               </button>
             )}
             <span className="text-xs font-mono-num text-[#5C635E] dark:text-[#9AA59E] whitespace-nowrap">
-              {tr(`Step ${step} of 5`, `क़दम ${step}/5`)}
+              <span className="sm:hidden">{step}/5</span>
+              <span className="hidden sm:inline">{tr(`Step ${step} of 5`, `क़दम ${step}/5`)}</span>
             </span>
           </div>
         </div>
       </header>
 
-      <main className="flex-1 flex items-center justify-center p-4 sm:p-8">
+      <main className="flex-1 flex flex-col items-center justify-center p-4 sm:p-8 gap-4">
+        {step === 1 && (
+          <div className="w-full max-w-2xl">
+            <PWAInstallButton variant="banner" />
+          </div>
+        )}
         <div className="w-full max-w-2xl bg-white dark:bg-[#151C19] border border-[#E5E2DC] dark:border-[#242E2A] rounded-2xl p-6 sm:p-10 space-y-8">
           {/* Progress Bar */}
           <div className="h-1.5 w-full rounded-full bg-[#F1EFE9] dark:bg-[#242E2A] overflow-hidden">

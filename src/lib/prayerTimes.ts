@@ -238,28 +238,69 @@ export const CALCULATION_METHOD_OPTIONS: { id: CalculationMethodKey; label: stri
   { id: 'turkey', label: 'Diyanet (Turkey)' },
 ];
 
-export type AlarmVoiceType = 'adhan_voice' | 'hijaz_chime' | 'voice_only' | 'gentle_chime';
+export type AlarmVoiceType =
+  | 'loud_digital_beep'
+  | 'loud_classic_bell'
+  | 'loud_siren_pulse'
+  | 'loud_wake_buzzer'
+  | 'adhan_voice'
+  | 'hijaz_chime'
+  | 'voice_only'
+  | 'gentle_chime';
 
-export const ALARM_VOICE_OPTIONS: { id: AlarmVoiceType; labelEn: string; labelHi: string }[] = [
+export const ALARM_VOICE_OPTIONS: {
+  id: AlarmVoiceType;
+  labelEn: string;
+  labelHi: string;
+  group: 'loud' | 'chime';
+}[] = [
+  {
+    id: 'loud_digital_beep',
+    labelEn: 'Loud Digital Alarm (Beep-Beep-Beep · No Voice/Music)',
+    labelHi: 'तेज़ डिजिटल अलार्म (बीप-बीप · बिना आवाज़/संगीत)',
+    group: 'loud',
+  },
+  {
+    id: 'loud_classic_bell',
+    labelEn: 'Loud Classic Alarm Bell (Ringing · No Voice/Music)',
+    labelHi: 'तेज़ क्लासिक अलार्म घंटी (बिना आवाज़/संगीत)',
+    group: 'loud',
+  },
+  {
+    id: 'loud_siren_pulse',
+    labelEn: 'Loud Urgent Tone Alert (Dual-Tone · No Voice/Music)',
+    labelHi: 'तेज़ अलर्ट टोन (डबल-टोन · बिना आवाज़/संगीत)',
+    group: 'loud',
+  },
+  {
+    id: 'loud_wake_buzzer',
+    labelEn: 'Loud Wake-Up Buzzer (Strong · No Voice/Music)',
+    labelHi: 'तेज़ जागने का बज़र (फ़ज्र/गहरी नींद · बिना आवाज़/संगीत)',
+    group: 'loud',
+  },
   {
     id: 'adhan_voice',
-    labelEn: 'Hijaz Chime + Voice Announcement',
-    labelHi: 'हिजाज़ धुन + आवाज़ में ऐलान',
+    labelEn: 'Hijaz Chime + Spoken Voice Reminder',
+    labelHi: 'हिजाज़ धुन + बोलकर नमाज़ अलार्म',
+    group: 'chime',
   },
   {
     id: 'hijaz_chime',
-    labelEn: 'Warm Mosque Chime (No Speech)',
-    labelHi: 'मस्जिद जैसी सुकून भरी धुन (सिर्फ़ घंटी)',
+    labelEn: 'Warm Mosque Chime (No Voice)',
+    labelHi: 'सुकून भरी मस्जिद धुन (बिना आवाज़)',
+    group: 'chime',
   },
   {
     id: 'voice_only',
     labelEn: 'Spoken Prayer Reminder Only',
-    labelHi: 'सिर्फ़ बोलकर नमाज़ अलार्म',
+    labelHi: 'सिर्फ़ बोलकर याद दिलाने वाला अलार्म',
+    group: 'chime',
   },
   {
     id: 'gentle_chime',
     labelEn: 'Soft Bell Chime',
     labelHi: 'हल्की घंटी',
+    group: 'chime',
   },
 ];
 
@@ -272,6 +313,7 @@ export interface PrayerTimeSettings {
   method: CalculationMethodKey;
   madhab: AsrMadhabKey;
   alarms: Record<PrayerType, boolean>;
+  beforeEndReminderEnabled: boolean;
   soundEnabled: boolean;
   alarmVoice: AlarmVoiceType;
 }
@@ -283,6 +325,8 @@ export interface PrayerWindow {
   end: Date;
   startFormatted: string;
   endFormatted: string;
+  closingAlertAt: Date;
+  closingAlertFormatted: string;
   endHint: string;
   isActive: boolean;
 }
@@ -313,8 +357,9 @@ export function getDefaultPrayerSettings(): PrayerTimeSettings {
       maghrib: false,
       isha: false,
     },
+    beforeEndReminderEnabled: true,
     soundEnabled: true,
-    alarmVoice: 'adhan_voice',
+    alarmVoice: 'loud_digital_beep',
   };
 }
 
@@ -327,6 +372,10 @@ export function loadPrayerSettings(): PrayerTimeSettings {
     return {
       ...fallback,
       ...parsed,
+      beforeEndReminderEnabled:
+        typeof parsed.beforeEndReminderEnabled === 'boolean'
+          ? parsed.beforeEndReminderEnabled
+          : fallback.beforeEndReminderEnabled,
       alarmVoice: parsed.alarmVoice || fallback.alarmVoice,
       alarms: {
         ...fallback.alarms,
@@ -427,6 +476,47 @@ function getDatePartsInTimezone(date: Date, timezone: string): { year: number; m
   };
 }
 
+function zonedTimeForDate(
+  refDate: Date,
+  hour24: number,
+  minute: number,
+  timezone: string
+): Date {
+  const { year, month, day } = getDatePartsInTimezone(refDate, timezone);
+  const utcGuess = new Date(Date.UTC(year, month - 1, day, hour24, minute, 0, 0));
+  try {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      year: 'numeric',
+      month: 'numeric',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: 'numeric',
+      hour12: false,
+    }).formatToParts(utcGuess);
+    const tzYear = parseInt(parts.find((p) => p.type === 'year')?.value || '', 10);
+    const tzMonth = parseInt(parts.find((p) => p.type === 'month')?.value || '', 10);
+    const tzDay = parseInt(parts.find((p) => p.type === 'day')?.value || '', 10);
+    const rawH = parseInt(parts.find((p) => p.type === 'hour')?.value || '', 10);
+    const tzHour = rawH === 24 ? 0 : rawH;
+    const tzMin = parseInt(parts.find((p) => p.type === 'minute')?.value || '', 10);
+    if (
+      !Number.isNaN(tzYear) &&
+      !Number.isNaN(tzMonth) &&
+      !Number.isNaN(tzDay) &&
+      !Number.isNaN(tzHour) &&
+      !Number.isNaN(tzMin)
+    ) {
+      const tzAsUtc = Date.UTC(tzYear, tzMonth - 1, tzDay, tzHour, tzMin, 0, 0);
+      const offsetMs = tzAsUtc - utcGuess.getTime();
+      return new Date(utcGuess.getTime() - offsetMs);
+    }
+  } catch {
+    // fallback below
+  }
+  return new Date(year, month - 1, day, hour24, minute, 0, 0);
+}
+
 export function calculatePrayerWindows(
   settings: PrayerTimeSettings,
   now = new Date()
@@ -451,11 +541,17 @@ export function calculatePrayerWindows(
   const nowMs = now.getTime();
   const isBeforeTodayFajr = nowMs < todayTimes.fajr.getTime();
 
+  const ishaStart = isBeforeTodayFajr ? yesterdayTimes.isha : todayTimes.isha;
+  const ishaEnd = isBeforeTodayFajr ? todayTimes.fajr : tomorrowTimes.fajr;
+  // User-requested Isha ending reminder: 30 minutes before 10:00 PM (9:30 PM)
+  const isha930Pm = zonedTimeForDate(ishaStart, 21, 30, settings.timezone);
+
   const rawList: {
     id: PrayerType;
     label: string;
     start: Date;
     end: Date;
+    closingAlertAt: Date;
     endHint: string;
   }[] = [
     {
@@ -463,6 +559,7 @@ export function calculatePrayerWindows(
       label: 'Fajr',
       start: todayTimes.fajr,
       end: todayTimes.sunrise,
+      closingAlertAt: new Date(todayTimes.sunrise.getTime() - 30 * 60_000),
       endHint: 'Ends at Sunrise',
     },
     {
@@ -470,6 +567,7 @@ export function calculatePrayerWindows(
       label: 'Dhuhr',
       start: todayTimes.dhuhr,
       end: todayTimes.asr,
+      closingAlertAt: new Date(todayTimes.asr.getTime() - 30 * 60_000),
       endHint: 'Ends at Asr',
     },
     {
@@ -477,6 +575,7 @@ export function calculatePrayerWindows(
       label: 'Asr',
       start: todayTimes.asr,
       end: todayTimes.maghrib,
+      closingAlertAt: new Date(todayTimes.maghrib.getTime() - 30 * 60_000),
       endHint: 'Ends at Maghrib',
     },
     {
@@ -484,14 +583,16 @@ export function calculatePrayerWindows(
       label: 'Maghrib',
       start: todayTimes.maghrib,
       end: todayTimes.isha,
+      closingAlertAt: new Date(todayTimes.isha.getTime() - 30 * 60_000),
       endHint: 'Ends at Isha',
     },
     {
       id: 'isha',
       label: 'Isha',
-      start: isBeforeTodayFajr ? yesterdayTimes.isha : todayTimes.isha,
-      end: isBeforeTodayFajr ? todayTimes.fajr : tomorrowTimes.fajr,
-      endHint: 'Ends at Fajr',
+      start: ishaStart,
+      end: ishaEnd,
+      closingAlertAt: isha930Pm,
+      endHint: 'Ends at Fajr (Alert 9:30 PM)',
     },
   ];
 
@@ -504,6 +605,8 @@ export function calculatePrayerWindows(
       end: item.end,
       startFormatted: formatClockTime(item.start, settings.timezone),
       endFormatted: formatClockTime(item.end, settings.timezone),
+      closingAlertAt: item.closingAlertAt,
+      closingAlertFormatted: formatClockTime(item.closingAlertAt, settings.timezone),
       endHint: item.endHint,
       isActive,
     };
@@ -523,6 +626,11 @@ export function calculatePrayerWindows(
       end: tomorrowTimes.sunrise,
       startFormatted: formatClockTime(tomorrowTimes.fajr, settings.timezone),
       endFormatted: formatClockTime(tomorrowTimes.sunrise, settings.timezone),
+      closingAlertAt: new Date(tomorrowTimes.sunrise.getTime() - 30 * 60_000),
+      closingAlertFormatted: formatClockTime(
+        new Date(tomorrowTimes.sunrise.getTime() - 30 * 60_000),
+        settings.timezone
+      ),
       endHint: 'Ends at Sunrise',
       isActive: false,
     } as PrayerWindow);
@@ -704,8 +812,57 @@ function speakPrayerAnnouncement(params: {
   }
 }
 
+function playLoudAlarmPulses(
+  pulses: { freq: number; delay: number; dur: number; peak: number; wave: OscillatorType }[]
+): void {
+  if (typeof window === 'undefined') return;
+  try {
+    const AudioCtx =
+      window.AudioContext ||
+      (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!AudioCtx) return;
+
+    const ctx = new AudioCtx();
+    if (ctx.state === 'suspended') {
+      void ctx.resume();
+    }
+
+    const compressor = ctx.createDynamicsCompressor();
+    compressor.threshold.setValueAtTime(-10, ctx.currentTime);
+    compressor.ratio.setValueAtTime(8, ctx.currentTime);
+    compressor.connect(ctx.destination);
+
+    const lowpass = ctx.createBiquadFilter();
+    lowpass.type = 'lowpass';
+    lowpass.frequency.setValueAtTime(3400, ctx.currentTime);
+    lowpass.connect(compressor);
+
+    pulses.forEach(({ freq, delay, dur, peak, wave }) => {
+      const start = ctx.currentTime + delay;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.type = wave;
+      osc.frequency.setValueAtTime(freq, start);
+
+      gain.gain.setValueAtTime(0.0001, start);
+      gain.gain.linearRampToValueAtTime(peak, start + 0.015);
+      gain.gain.setValueAtTime(peak, start + Math.max(0.02, dur - 0.025));
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + dur);
+
+      osc.connect(gain);
+      gain.connect(lowpass);
+
+      osc.start(start);
+      osc.stop(start + dur + 0.03);
+    });
+  } catch {
+    // Ignore audio context restrictions
+  }
+}
+
 export function playPrayerAlarmAudio(
-  voiceType: AlarmVoiceType = 'adhan_voice',
+  voiceType: AlarmVoiceType = 'loud_digital_beep',
   options?: {
     prayerLabel?: string;
     prayerLabelHi?: string;
@@ -713,6 +870,68 @@ export function playPrayerAlarmAudio(
     lang?: 'en' | 'hi';
   }
 ): void {
+  // Loud Digital Alarm: Classic triple-beep bursts (non-music, no voice)
+  if (voiceType === 'loud_digital_beep') {
+    const pulses: { freq: number; delay: number; dur: number; peak: number; wave: OscillatorType }[] = [];
+    for (let cycle = 0; cycle < 4; cycle += 1) {
+      const base = cycle * 0.95;
+      pulses.push(
+        { freq: 1180, delay: base, dur: 0.14, peak: 0.45, wave: 'square' },
+        { freq: 1180, delay: base + 0.2, dur: 0.14, peak: 0.45, wave: 'square' },
+        { freq: 1180, delay: base + 0.4, dur: 0.18, peak: 0.48, wave: 'square' }
+      );
+    }
+    playLoudAlarmPulses(pulses);
+    return;
+  }
+
+  // Loud Classic Alarm Bell: Rapid mechanical ringing oscillation (no voice/music)
+  if (voiceType === 'loud_classic_bell') {
+    const pulses: { freq: number; delay: number; dur: number; peak: number; wave: OscillatorType }[] = [];
+    for (let burst = 0; burst < 3; burst += 1) {
+      const offset = burst * 1.1;
+      for (let i = 0; i < 12; i += 1) {
+        pulses.push({
+          freq: i % 2 === 0 ? 1240 : 1480,
+          delay: offset + i * 0.06,
+          dur: 0.055,
+          peak: 0.44,
+          wave: 'triangle',
+        });
+      }
+    }
+    playLoudAlarmPulses(pulses);
+    return;
+  }
+
+  // Loud Dual-Tone Urgent Alert (no voice/music)
+  if (voiceType === 'loud_siren_pulse') {
+    const pulses: { freq: number; delay: number; dur: number; peak: number; wave: OscillatorType }[] = [];
+    for (let cycle = 0; cycle < 4; cycle += 1) {
+      const base = cycle * 0.85;
+      pulses.push(
+        { freq: 820, delay: base, dur: 0.34, peak: 0.46, wave: 'sawtooth' },
+        { freq: 1080, delay: base + 0.36, dur: 0.36, peak: 0.48, wave: 'sawtooth' }
+      );
+    }
+    playLoudAlarmPulses(pulses);
+    return;
+  }
+
+  // Loud Wake-Up Buzzer: Heavy sustained alarm pulses (no voice/music)
+  if (voiceType === 'loud_wake_buzzer') {
+    const pulses: { freq: number; delay: number; dur: number; peak: number; wave: OscillatorType }[] = [];
+    for (let cycle = 0; cycle < 4; cycle += 1) {
+      const base = cycle * 0.9;
+      pulses.push(
+        { freq: 920, delay: base, dur: 0.55, peak: 0.52, wave: 'square' },
+        { freq: 920, delay: base + 0.62, dur: 0.16, peak: 0.48, wave: 'square' }
+      );
+    }
+    playLoudAlarmPulses(pulses);
+    return;
+  }
+
   const prayerLabel = options?.prayerLabel || 'Salah';
   const prayerLabelHi = options?.prayerLabelHi || 'नमाज़';
   const locationLabel = options?.locationLabel || 'your area';
@@ -738,7 +957,7 @@ export function playPrayerAlarmAudio(
     return;
   }
 
-  // Hijaz maqam-inspired warm resonant cadence (D4 - Eb4 - F#4 - G4 - A4 - Bb4 - A4 - G4)
+  // Hijaz maqam-inspired warm resonant cadence
   playWarmHarmonicNotes([
     { freq: 293.66, delay: 0.0, dur: 0.65, peak: 0.15 },
     { freq: 311.13, delay: 0.34, dur: 0.65, peak: 0.15 },
@@ -776,7 +995,10 @@ export function downloadPrayerAlarmsIcs(settings: PrayerTimeSettings, daysAhead 
   const enabledPrayers = (['fajr', 'dhuhr', 'asr', 'maghrib', 'isha'] as PrayerType[]).filter(
     (p) => settings.alarms[p]
   );
-  const activeList = enabledPrayers.length > 0 ? enabledPrayers : (['fajr', 'dhuhr', 'asr', 'maghrib', 'isha'] as PrayerType[]);
+  const activeList =
+    enabledPrayers.length > 0
+      ? enabledPrayers
+      : (['fajr', 'dhuhr', 'asr', 'maghrib', 'isha'] as PrayerType[]);
 
   const lines: string[] = [
     'BEGIN:VCALENDAR',
@@ -791,32 +1013,63 @@ export function downloadPrayerAlarmsIcs(settings: PrayerTimeSettings, daysAhead 
 
   for (let offset = 0; offset < daysAhead; offset += 1) {
     const dayDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + offset);
-    const { windows } = calculatePrayerWindows(settings, new Date(dayDate.getFullYear(), dayDate.getMonth(), dayDate.getDate(), 12, 0, 0));
+    const { windows } = calculatePrayerWindows(
+      settings,
+      new Date(dayDate.getFullYear(), dayDate.getMonth(), dayDate.getDate(), 12, 0, 0)
+    );
 
     for (const w of windows) {
-      if (!activeList.includes(w.id)) continue;
-      if (w.start.getTime() < now.getTime() - 60000) continue;
+      if (activeList.includes(w.id) && w.start.getTime() >= now.getTime() - 60000) {
+        const alarmStart = w.start;
+        const alarmEnd = new Date(w.start.getTime() + 15 * 60000);
+        const uid = `qazaflow-${w.id}-${alarmStart.getTime()}@qazaflow.app`;
 
-      const alarmStart = w.start;
-      const alarmEnd = new Date(w.start.getTime() + 15 * 60000);
-      const uid = `qazaflow-${w.id}-${alarmStart.getTime()}@qazaflow.app`;
+        lines.push(
+          'BEGIN:VEVENT',
+          `UID:${uid}`,
+          `DTSTAMP:${formatIcsUtc(now)}`,
+          `DTSTART:${formatIcsUtc(alarmStart)}`,
+          `DTEND:${formatIcsUtc(alarmEnd)}`,
+          `SUMMARY:${w.label} Prayer Time (${w.startFormatted} - ${w.endFormatted})`,
+          `DESCRIPTION:${w.label} prayer window for ${settings.locationLabel}: ${w.startFormatted} to ${w.endFormatted}.`,
+          'BEGIN:VALARM',
+          'TRIGGER:PT0M',
+          'ACTION:DISPLAY',
+          `DESCRIPTION:Time for ${w.label} (${w.startFormatted} - ${w.endFormatted})`,
+          'END:VALARM',
+          'END:VEVENT'
+        );
+        eventCount += 1;
+      }
 
-      lines.push(
-        'BEGIN:VEVENT',
-        `UID:${uid}`,
-        `DTSTAMP:${formatIcsUtc(now)}`,
-        `DTSTART:${formatIcsUtc(alarmStart)}`,
-        `DTEND:${formatIcsUtc(alarmEnd)}`,
-        `SUMMARY:${w.label} Prayer Time (${w.startFormatted} - ${w.endFormatted})`,
-        `DESCRIPTION:${w.label} prayer window for ${settings.locationLabel}: ${w.startFormatted} to ${w.endFormatted} (${w.endHint}).`,
-        'BEGIN:VALARM',
-        'TRIGGER:PT0M',
-        'ACTION:DISPLAY',
-        `DESCRIPTION:Time for ${w.label} (${w.startFormatted} - ${w.endFormatted})`,
-        'END:VALARM',
-        'END:VEVENT'
-      );
-      eventCount += 1;
+      if (
+        settings.beforeEndReminderEnabled &&
+        w.closingAlertAt.getTime() >= now.getTime() - 60000
+      ) {
+        const warnStart = w.closingAlertAt;
+        const warnEnd = new Date(warnStart.getTime() + 10 * 60000);
+        const warnSummary =
+          w.id === 'isha'
+            ? `Isha Reminder (9:30 PM - 30 min before 10 PM)`
+            : `${w.label} Ending Soon (30 min left until ${w.endFormatted})`;
+
+        lines.push(
+          'BEGIN:VEVENT',
+          `UID:qazaflow-endwarn-${w.id}-${warnStart.getTime()}@qazaflow.app`,
+          `DTSTAMP:${formatIcsUtc(now)}`,
+          `DTSTART:${formatIcsUtc(warnStart)}`,
+          `DTEND:${formatIcsUtc(warnEnd)}`,
+          `SUMMARY:${warnSummary}`,
+          `DESCRIPTION:${warnSummary} in ${settings.locationLabel}.`,
+          'BEGIN:VALARM',
+          'TRIGGER:PT0M',
+          'ACTION:DISPLAY',
+          `DESCRIPTION:${warnSummary}`,
+          'END:VALARM',
+          'END:VEVENT'
+        );
+        eventCount += 1;
+      }
     }
   }
 

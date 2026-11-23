@@ -31,6 +31,56 @@
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
+@keyframes qazaCheckPop {
+  0% {
+    transform: scale(0.72);
+  }
+  55% {
+    transform: scale(1.16);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes qazaRingBurst {
+  0% {
+    transform: scale(0.8);
+    opacity: 0.7;
+  }
+  100% {
+    transform: scale(1.75);
+    opacity: 0;
+  }
+}
+
+@keyframes qazaFloatUp {
+  0% {
+    transform: translateY(6px) scale(0.9);
+    opacity: 0;
+  }
+  25% {
+    transform: translateY(0px) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-16px) scale(0.98);
+    opacity: 0;
+  }
+}
+
+.animate-check-pop {
+  animation: qazaCheckPop 360ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-ring-burst {
+  animation: qazaRingBurst 520ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-float-up {
+  animation: qazaFloatUp 850ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;

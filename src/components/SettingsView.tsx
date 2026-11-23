@@ -1,15 +1,23 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertTriangle,
   Bell,
+  Check,
   CheckCircle2,
   Cloud,
+  Copy,
   Download,
+  ExternalLink,
   FileText,
+  Heart,
   Languages,
   LogOut,
+  Mail,
+  MessageCircle,
   Moon,
   RefreshCw,
+  Send,
+  Share2,
   Shield,
   Sun,
   Upload,
@@ -95,6 +103,129 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onOpenAuth }) => {
     typeof Notification !== 'undefined' ? Notification.permission : 'unsupported'
   );
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Share & Referral state
+  const [copiedShare, setCopiedShare] = useState(false);
+
+  // Feedback Contact Form state
+  const [feedbackName, setFeedbackName] = useState(user?.displayName || '');
+  const [feedbackEmail, setFeedbackEmail] = useState(user?.email || '');
+  const [feedbackTopic, setFeedbackTopic] = useState<'Feedback' | 'Bug Report' | 'Feature Request'>('Feedback');
+  const [feedbackMessage, setFeedbackMessage] = useState('');
+  const [feedbackSending, setFeedbackSending] = useState(false);
+  const [feedbackStatus, setFeedbackStatus] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  const shareUrl = useMemo(() => {
+    if (typeof window === 'undefined') return 'https://qaza-app.vercel.app/';
+    return window.location.origin;
+  }, []);
+
+  const shareMessage = useMemo(() => {
+    if (lang === 'hi') {
+      return (
+        `अस्सलामु अलैकुम! अपनी छूटी हुई (क़ज़ा) और रोज़ाना 5 नमाज़ों का पूरा हिसाब रखें।\n\n` +
+        `रसूलुल्लाह ﷺ ने फ़रमाया:\n` +
+        `"जो शख़्स कोई नमाज़ भूल जाए (या छूट जाए), तो जब याद आए उसे अदा कर ले; इसके सिवा उसका कोई कफ़्फ़ारा नहीं।" (सहीह बुख़ारी 597, सहीह मुस्लिम 684)\n\n` +
+        `और आप ﷺ ने फ़रमाया:\n` +
+        `"जो किसी को नेकी का रास्ता दिखाए, उसे भी उतना ही सवाब मिलता है जितना उस नेकी करने वाले को मिलता है।" (सहीह मुस्लिम 1893)\n\n` +
+        `आप जितने ज़्यादा लोगों को यह ऐप भेजेंगे और वे आपकी वजह से अपनी क़ज़ा व रोज़ाना की नमाज़ें पढ़ेंगे, इंशाअल्लाह आपको भी उसका सदक़ा-ए-जारिया सवाब मिलता रहेगा।\n\n` +
+        `QazaFlow ऐप मुफ़्त इस्तेमाल करें:\n${shareUrl}`
+      );
+    }
+    return (
+      `As-salamu alaykum! Don't let missed (Qaza) prayers stay forgotten—start clearing them calmly every day.\n\n` +
+      `The Prophet Muhammad ﷺ said:\n` +
+      `"Whoever forgets a prayer (or misses it), let him pray it when he remembers it; there is no expiation for it except that." (Sahih al-Bukhari 597 & Sahih Muslim 684)\n\n` +
+      `And he ﷺ said:\n` +
+      `"Whoever guides someone to goodness will have a reward like the one who does it." (Sahih Muslim 1893)\n\n` +
+      `The more friends and family you refer—whenever they pray their daily & Qaza Salah because of you, you share in those good deeds too (Sadaqah Jariyah), InshaAllah!\n\n` +
+      `Try QazaFlow free here:\n${shareUrl}`
+    );
+  }, [lang, shareUrl]);
+
+  const encodedShareMsg = encodeURIComponent(shareMessage);
+  const encodedShareUrl = encodeURIComponent(shareUrl);
+  const whatsappShareHref = `https://wa.me/?text=${encodedShareMsg}`;
+  const telegramShareHref = `https://t.me/share/url?url=${encodedShareUrl}&text=${encodedShareMsg}`;
+  const twitterShareHref = `https://twitter.com/intent/tweet?text=${encodedShareMsg}`;
+  const facebookShareHref = `https://www.facebook.com/sharer/sharer.php?u=${encodedShareUrl}&quote=${encodedShareMsg}`;
+
+  const directEmailSubject = encodeURIComponent(`QazaFlow ${feedbackTopic}`);
+  const directEmailBody = encodeURIComponent(
+    feedbackMessage.trim()
+      ? `${feedbackMessage.trim()}\n\n— ${feedbackName.trim() || 'QazaFlow User'}${feedbackEmail.trim() ? ` (${feedbackEmail.trim()})` : ''}`
+      : tr('As-salamu alaykum,\n\nHere is my feedback for QazaFlow:\n', 'अस्सलामु अलैकुम,\n\nQazaFlow ऐप के बारे में मेरा सुझाव:\n')
+  );
+  const gmailComposeHref = `https://mail.google.com/mail/?view=cm&fs=1&to=zaidmohd1996@gmail.com&su=${directEmailSubject}&body=${directEmailBody}`;
+  const mailtoHref = `mailto:zaidmohd1996@gmail.com?subject=${directEmailSubject}&body=${directEmailBody}`;
+
+  const handleCopyShare = async () => {
+    try {
+      await navigator.clipboard.writeText(shareMessage);
+      setCopiedShare(true);
+      window.setTimeout(() => setCopiedShare(false), 3000);
+    } catch {
+      notifySaved(tr('Select and copy the message above.', 'ऊपर लिखे संदेश को कॉपी करें।'));
+    }
+  };
+
+  const handleNativeShare = async () => {
+    if (typeof navigator === 'undefined' || typeof navigator.share !== 'function') return;
+    try {
+      await navigator.share({
+        title: 'QazaFlow — Qaza & Daily Namaz Tracker',
+        text: shareMessage,
+        url: shareUrl,
+      });
+    } catch {
+      // user cancelled
+    }
+  };
+
+  const handleSendFeedback = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!feedbackMessage.trim()) return;
+    setFeedbackSending(true);
+    setFeedbackStatus(null);
+    try {
+      const res = await fetch('https://formsubmit.co/ajax/zaidmohd1996@gmail.com', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: JSON.stringify({
+          name: feedbackName.trim() || 'QazaFlow User',
+          email: feedbackEmail.trim() || 'not-provided@qazaflow.app',
+          topic: feedbackTopic,
+          message: feedbackMessage.trim(),
+          _subject: `QazaFlow ${feedbackTopic}`,
+          _template: 'table',
+        }),
+      });
+      if (!res.ok) {
+        throw new Error('Request failed');
+      }
+      setFeedbackStatus({
+        type: 'success',
+        text: tr(
+          'JazakAllahu Khayran! Your feedback was sent to zaidmohd1996@gmail.com.',
+          'जज़ाकल्लाहु ख़ैरन! आपका संदेश zaidmohd1996@gmail.com पर भेज दिया गया है।'
+        ),
+      });
+      setFeedbackMessage('');
+    } catch {
+      setFeedbackStatus({
+        type: 'error',
+        text: tr(
+          'Could not send directly right now (offline or blocked). Tap "Open in Gmail" or "Email App" below—your message is already filled in.',
+          'अभी सीधे भेजा नहीं जा सका। नीचे "Gmail में खोलें" या "Email ऐप" पर टैप करें—आपका संदेश पहले से भरा हुआ है।'
+        ),
+      });
+    } finally {
+      setFeedbackSending(false);
+    }
+  };
 
   const notifySaved = (msg: string) => {
     setErrorBanner(null);
@@ -761,6 +892,263 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onOpenAuth }) => {
             )}
           </p>
         </div>
+      </section>
+
+      {/* Share & Refer Friends (Sadaqah Jariyah) */}
+      <section className="bg-white dark:bg-[#151C19] border border-[#E5E2DC] dark:border-[#242E2A] rounded-2xl p-6 space-y-4">
+        <div className="flex items-start gap-3">
+          <Share2 className="w-5 h-5 text-[#1B4D3E] dark:text-[#7FD1B2] mt-0.5 shrink-0" />
+          <div>
+            <h2 className="text-lg font-semibold">
+              {tr('Share & Earn Ongoing Good Deeds', 'ऐप शेयर करें और सदक़ा-ए-जारिया कमाएं')}
+            </h2>
+            <p className="text-xs text-[#5C635E] dark:text-[#9AA59E] mt-0.5 leading-relaxed">
+              {tr(
+                'The more people you refer who start praying their daily and Qaza Salah because of your reminder, the more continuous reward (Sadaqah Jariyah) you receive too.',
+                'आप जितने ज़्यादा लोगों को यह ऐप भेजेंगे और वे आपकी वजह से नमाज़ व क़ज़ा अदा करेंगे, आपको भी उसका बराबर सवाब मिलता रहेगा।'
+              )}
+            </p>
+          </div>
+        </div>
+
+        {/* Hadith Quote & Referral Reward Highlight */}
+        <div className="p-4 rounded-xl bg-[#F8F7F4] dark:bg-[#0E1311] border border-[#E5E2DC] dark:border-[#242E2A] space-y-2.5 text-xs leading-relaxed">
+          <p className="text-[#1A1D1B] dark:text-[#F1F3F2]">
+            <span className="font-semibold text-[#1B4D3E] dark:text-[#7FD1B2]">
+              {tr('Importance of Qaza Salah:', 'क़ज़ा नमाज़ की अहमियत:')}{' '}
+            </span>
+            {tr(
+              '"Whoever forgets a prayer (or misses it), let him pray it when he remembers it; there is no expiation for it except that." — Sahih al-Bukhari 597 & Sahih Muslim 684',
+              '"जो शख़्स कोई नमाज़ भूल जाए (या छूट जाए), तो जब याद आए उसे अदा कर ले; इसके सिवा उसका कोई कफ़्फ़ारा नहीं।" — सहीह बुख़ारी 597, सहीह मुस्लिम 684'
+            )}
+          </p>
+          <p className="text-[#5C635E] dark:text-[#9AA59E] pt-2 border-t border-[#E5E2DC] dark:border-[#242E2A]">
+            <span className="font-semibold text-[#1B4D3E] dark:text-[#7FD1B2]">
+              {tr('Reward of Referring Others:', 'दूसरों को नेकी बताने का सवाब:')}{' '}
+            </span>
+            {tr(
+              '"Whoever guides someone to goodness will have a reward like the one who does it." — Sahih Muslim 1893',
+              '"जो किसी को नेकी का रास्ता दिखाए, उसे भी उतना ही सवाब मिलता है जितना उस नेकी करने वाले को मिलता है।" — सहीह मुस्लिम 1893'
+            )}
+          </p>
+        </div>
+
+        {/* Top Primary Share: WhatsApp First */}
+        <div className="space-y-2.5">
+          <a
+            href={whatsappShareHref}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-full min-h-[46px] px-4 rounded-xl bg-[#1E8E5A] hover:bg-[#18764A] text-white text-sm font-medium inline-flex items-center justify-center gap-2 transition-colors"
+          >
+            <MessageCircle className="w-4 h-4 shrink-0" />
+            <span>{tr('Share on WhatsApp (Recommended)', 'WhatsApp पर शेयर करें (सबसे आसान)')}</span>
+          </a>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <a
+              href={telegramShareHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="min-h-[42px] px-3 rounded-xl border border-[#E5E2DC] dark:border-[#242E2A] bg-[#F8F7F4] dark:bg-[#0E1311] hover:border-[#1B4D3E] text-xs font-medium inline-flex items-center justify-center gap-1.5"
+            >
+              <Send className="w-3.5 h-3.5 text-[#1B4D3E] dark:text-[#7FD1B2]" />
+              <span>Telegram</span>
+            </a>
+
+            <a
+              href={twitterShareHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="min-h-[42px] px-3 rounded-xl border border-[#E5E2DC] dark:border-[#242E2A] bg-[#F8F7F4] dark:bg-[#0E1311] hover:border-[#1B4D3E] text-xs font-medium inline-flex items-center justify-center gap-1.5"
+            >
+              <ExternalLink className="w-3.5 h-3.5 text-[#1B4D3E] dark:text-[#7FD1B2]" />
+              <span>X / Twitter</span>
+            </a>
+
+            <a
+              href={facebookShareHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="min-h-[42px] px-3 rounded-xl border border-[#E5E2DC] dark:border-[#242E2A] bg-[#F8F7F4] dark:bg-[#0E1311] hover:border-[#1B4D3E] text-xs font-medium inline-flex items-center justify-center gap-1.5"
+            >
+              <ExternalLink className="w-3.5 h-3.5 text-[#1B4D3E] dark:text-[#7FD1B2]" />
+              <span>Facebook</span>
+            </a>
+
+            <button
+              type="button"
+              onClick={() => void handleCopyShare()}
+              className="min-h-[42px] px-3 rounded-xl border border-[#E5E2DC] dark:border-[#242E2A] bg-[#F8F7F4] dark:bg-[#0E1311] hover:border-[#1B4D3E] text-xs font-medium inline-flex items-center justify-center gap-1.5"
+            >
+              {copiedShare ? (
+                <>
+                  <Check className="w-3.5 h-3.5 text-[#2E7D5B]" />
+                  <span>{tr('Copied!', 'कॉपी हो गया!')}</span>
+                </>
+              ) : (
+                <>
+                  <Copy className="w-3.5 h-3.5 text-[#1B4D3E] dark:text-[#7FD1B2]" />
+                  <span>{tr('Copy Message', 'मैसेज कॉपी करें')}</span>
+                </>
+              )}
+            </button>
+          </div>
+
+          {typeof navigator !== 'undefined' && typeof navigator.share === 'function' && (
+            <button
+              type="button"
+              onClick={() => void handleNativeShare()}
+              className="w-full min-h-[40px] px-3 rounded-xl border border-[#E5E2DC] dark:border-[#242E2A] text-xs font-medium text-[#5C635E] dark:text-[#9AA59E] hover:text-[#1A1D1B] dark:hover:text-[#F1F3F2] inline-flex items-center justify-center gap-1.5"
+            >
+              <Share2 className="w-3.5 h-3.5" />
+              <span>{tr('More Share Options (Phone Share Sheet)', 'अन्य ऐप्स से शेयर करें')}</span>
+            </button>
+          )}
+        </div>
+      </section>
+
+      {/* Feedback & Contact Developer */}
+      <section className="bg-white dark:bg-[#151C19] border border-[#E5E2DC] dark:border-[#242E2A] rounded-2xl p-6 space-y-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="flex items-start gap-3">
+            <Heart className="w-5 h-5 text-[#1B4D3E] dark:text-[#7FD1B2] mt-0.5 shrink-0" />
+            <div>
+              <h2 className="text-lg font-semibold">
+                {tr('Send Feedback & Suggestions', 'सुझाव और फ़ीडबैक भेजें')}
+              </h2>
+              <p className="text-xs text-[#5C635E] dark:text-[#9AA59E] mt-0.5">
+                {tr(
+                  'Send a message directly from here or open your email app to zaidmohd1996@gmail.com.',
+                  'सीधे यहाँ से संदेश भेजें या Gmail / ईमेल ऐप से zaidmohd1996@gmail.com पर लिखें।'
+                )}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <a
+              href={gmailComposeHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="min-h-[38px] px-3.5 rounded-xl border border-[#1B4D3E]/30 dark:border-[#2A6F5A]/50 bg-[#1B4D3E]/8 dark:bg-[#2A6F5A]/15 text-[#1B4D3E] dark:text-[#7FD1B2] text-xs font-medium inline-flex items-center gap-1.5 hover:bg-[#1B4D3E]/15 whitespace-nowrap"
+            >
+              <Mail className="w-3.5 h-3.5" />
+              <span>{tr('Open Gmail', 'Gmail खोलें')}</span>
+            </a>
+            <a
+              href={mailtoHref}
+              className="min-h-[38px] px-3.5 rounded-xl border border-[#E5E2DC] dark:border-[#242E2A] bg-[#F8F7F4] dark:bg-[#0E1311] text-xs font-medium inline-flex items-center gap-1.5 hover:border-[#1B4D3E] whitespace-nowrap"
+            >
+              <ExternalLink className="w-3.5 h-3.5 text-[#1B4D3E] dark:text-[#7FD1B2]" />
+              <span>{tr('Email App', 'ईमेल ऐप')}</span>
+            </a>
+          </div>
+        </div>
+
+        <form onSubmit={(e) => void handleSendFeedback(e)} className="space-y-3">
+          <div className="grid sm:grid-cols-3 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-[#5C635E] dark:text-[#9AA59E] mb-1">
+                {tr('Your Name (optional)', 'आपका नाम (वैकल्पिक)')}
+              </label>
+              <input
+                type="text"
+                maxLength={80}
+                value={feedbackName}
+                onChange={(e) => setFeedbackName(e.target.value)}
+                placeholder={tr('e.g. Zaid', 'जैसे: ज़ैद')}
+                className="w-full min-h-[42px] px-3 rounded-xl border border-[#E5E2DC] dark:border-[#242E2A] bg-[#F8F7F4] dark:bg-[#0E1311] text-sm"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-[#5C635E] dark:text-[#9AA59E] mb-1">
+                {tr('Your Email (for reply)', 'आपका ईमेल (जवाब के लिए)')}
+              </label>
+              <input
+                type="email"
+                maxLength={120}
+                value={feedbackEmail}
+                onChange={(e) => setFeedbackEmail(e.target.value)}
+                placeholder="you@example.com"
+                className="w-full min-h-[42px] px-3 rounded-xl border border-[#E5E2DC] dark:border-[#242E2A] bg-[#F8F7F4] dark:bg-[#0E1311] text-sm"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-[#5C635E] dark:text-[#9AA59E] mb-1">
+                {tr('Topic', 'विषय')}
+              </label>
+              <select
+                value={feedbackTopic}
+                onChange={(e) =>
+                  setFeedbackTopic(e.target.value as 'Feedback' | 'Bug Report' | 'Feature Request')
+                }
+                className="w-full min-h-[42px] px-3 rounded-xl border border-[#E5E2DC] dark:border-[#242E2A] bg-[#F8F7F4] dark:bg-[#0E1311] text-sm"
+              >
+                <option value="Feedback">{tr('Feedback / Dua', 'सुझाव / दुआ')}</option>
+                <option value="Feature Request">{tr('Feature Request', 'नया फ़ीचर सुझाव')}</option>
+                <option value="Bug Report">{tr('Bug / Issue Report', 'समस्या की रिपोर्ट')}</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-[#5C635E] dark:text-[#9AA59E] mb-1">
+              {tr('Message', 'संदेश')}
+            </label>
+            <textarea
+              required
+              rows={3}
+              maxLength={1500}
+              value={feedbackMessage}
+              onChange={(e) => setFeedbackMessage(e.target.value)}
+              placeholder={tr(
+                'Share an idea, bug report, or request...',
+                'अपना सुझाव, समस्या या कोई नई सुविधा के बारे में लिखें...'
+              )}
+              className="w-full p-3 rounded-xl border border-[#E5E2DC] dark:border-[#242E2A] bg-[#F8F7F4] dark:bg-[#0E1311] text-sm"
+            />
+          </div>
+
+          {feedbackStatus && (
+            <div
+              className={`rounded-xl px-3.5 py-2.5 text-xs border ${
+                feedbackStatus.type === 'success'
+                  ? 'border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300'
+                  : 'border-[#B88E44]/40 bg-[#B88E44]/10 text-[#1A1D1B] dark:text-[#F1F3F2]'
+              }`}
+            >
+              {feedbackStatus.text}
+            </div>
+          )}
+
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <span className="text-[11px] text-[#7A827D]">
+              {tr('Direct email:', 'सीधा ईमेल:')}{' '}
+              <a
+                href={mailtoHref}
+                className="underline text-[#1B4D3E] dark:text-[#7FD1B2]"
+              >
+                zaidmohd1996@gmail.com
+              </a>
+            </span>
+
+            <button
+              type="submit"
+              disabled={feedbackSending || !feedbackMessage.trim()}
+              className="min-h-[42px] px-5 rounded-xl bg-[#1B4D3E] dark:bg-[#2A6F5A] text-white text-xs font-medium hover:bg-[#143B2F] disabled:opacity-50 inline-flex items-center gap-2"
+            >
+              <Send className="w-3.5 h-3.5" />
+              <span>
+                {feedbackSending
+                  ? tr('Sending...', 'भेजा जा रहा है...')
+                  : tr('Send Feedback', 'फ़ीडबैक भेजें')}
+              </span>
+            </button>
+          </div>
+        </form>
       </section>
 
       {/* Danger Zone */}

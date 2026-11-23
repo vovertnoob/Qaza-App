@@ -56,8 +56,8 @@ export const ROUTINE_OPTIONS: {
 }[] = [
   {
     id: 'after_each_prayer',
-    title: 'Pair with daily Salah',
-    description: 'Pray one corresponding Qaza after each daily prayer.',
+    title: '5 Qaza per day (1 per prayer time)',
+    description: 'Pray one Qaza after each of the five daily prayer times.',
   },
   {
     id: 'full_qaza_day',

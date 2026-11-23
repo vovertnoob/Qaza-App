@@ -44,8 +44,8 @@ export const ROUTINE_I18N: Record<
 > = {
   en: {
     after_each_prayer: {
-      title: 'Pair with daily Salah',
-      description: 'Pray one corresponding Qaza after each daily prayer.',
+      title: '5 Qaza per day (1 per prayer time)',
+      description: 'Offer one Qaza at each of the five daily prayer times.',
     },
     full_qaza_day: {
       title: 'Complete one full Qaza day',
@@ -66,8 +66,8 @@ export const ROUTINE_I18N: Record<
   },
   hi: {
     after_each_prayer: {
-      title: 'हर वक़्त की नमाज़ के साथ',
-      description: 'हर फ़र्ज़ नमाज़ के बाद उसी वक़्त की एक क़ज़ा नमाज़ पढ़ें।',
+      title: 'हर वक़्त की नमाज़ के बाद 1 क़ज़ा (रोज़ 5)',
+      description: 'पाँचों वक़्त के बाद 1-1 क़ज़ा नमाज़ अदा करें।',
     },
     full_qaza_day: {
       title: 'एक पूरा क़ज़ा दिन मुकम्मल करें',

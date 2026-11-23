@@ -11,24 +11,29 @@ import { PRAYER_LABELS_I18N, type AppLanguage } from '../lib/i18n';
 import type { PrayerType } from '../types/qaza';
 
 const FIRED_PREFIX = 'qazaflow_alarm_fired_v1_';
+const END_WARN_PREFIX = 'qazaflow_endwarn_fired_v1_';
 
-function wasAlarmFired(dateKey: string, prayerId: PrayerType): boolean {
+function wasFired(prefix: string, dateKey: string, prayerId: PrayerType): boolean {
   try {
-    return localStorage.getItem(`${FIRED_PREFIX}${dateKey}_${prayerId}`) === '1';
+    return localStorage.getItem(`${prefix}${dateKey}_${prayerId}`) === '1';
   } catch {
     return false;
   }
 }
 
-function markAlarmFired(dateKey: string, prayerId: PrayerType): void {
+function markFired(prefix: string, dateKey: string, prayerId: PrayerType): void {
   try {
-    localStorage.setItem(`${FIRED_PREFIX}${dateKey}_${prayerId}`, '1');
+    localStorage.setItem(`${prefix}${dateKey}_${prayerId}`, '1');
   } catch {
     // ignore
   }
 }
 
-async function showBrowserOrSwNotification(title: string, body: string): Promise<boolean> {
+async function showBrowserOrSwNotification(
+  title: string,
+  body: string,
+  tag?: string
+): Promise<boolean> {
   if (typeof Notification === 'undefined' || Notification.permission !== 'granted') {
     return false;
   }
@@ -41,7 +46,7 @@ async function showBrowserOrSwNotification(title: string, body: string): Promise
           body,
           icon: '/pwa-192x192.png',
           badge: '/pwa-192x192.png',
-          tag: title,
+          tag: tag || title,
         });
         return true;
       }
@@ -54,6 +59,7 @@ async function showBrowserOrSwNotification(title: string, body: string): Promise
     new Notification(title, {
       body,
       icon: '/pwa-192x192.png',
+      tag: tag || title,
     });
     return true;
   } catch {
@@ -85,39 +91,92 @@ export function usePrayerAlarms(
       setNow(currentNow);
 
       if (!settings.locationConfigured) return;
-      const anyAlarmOn = Object.values(settings.alarms).some(Boolean);
-      if (!anyAlarmOn) return;
+      const anyStartAlarmOn = Object.values(settings.alarms).some(Boolean);
+      if (!anyStartAlarmOn && !settings.beforeEndReminderEnabled) return;
 
       const { windows } = calculatePrayerWindows(settings, currentNow);
       const dateKey = getLocalDateKey(currentNow);
       const nowMs = currentNow.getTime();
 
       for (const w of windows) {
-        if (!settings.alarms[w.id]) continue;
-        const diffMs = nowMs - w.start.getTime();
-        if (diffMs >= 0 && diffMs <= 120_000 && !wasAlarmFired(dateKey, w.id)) {
-          markAlarmFired(dateKey, w.id);
-          const prayerEn = PRAYER_LABELS_I18N.en[w.id];
-          const prayerHi = PRAYER_LABELS_I18N.hi[w.id];
+        const prayerEn = PRAYER_LABELS_I18N.en[w.id];
+        const prayerHi = PRAYER_LABELS_I18N.hi[w.id];
 
-          const title =
-            lang === 'hi' ? `${prayerHi} की नमाज़ का वक़्त` : `${prayerEn} Prayer Time`;
-          const body =
-            lang === 'hi'
-              ? `${settings.locationLabel} में ${prayerHi} का समय शुरू हो गया (${w.startFormatted} – ${w.endFormatted})।`
-              : `${prayerEn} time has started (${w.startFormatted} – ${w.endFormatted}) in ${settings.locationLabel}.`;
+        // 1. Start-of-prayer alarm
+        if (settings.alarms[w.id]) {
+          const startDiffMs = nowMs - w.start.getTime();
+          if (startDiffMs >= 0 && startDiffMs <= 120_000 && !wasFired(FIRED_PREFIX, dateKey, w.id)) {
+            markFired(FIRED_PREFIX, dateKey, w.id);
 
-          if (settings.soundEnabled) {
-            playPrayerAlarmAudio(settings.alarmVoice, {
-              prayerLabel: prayerEn,
-              prayerLabelHi: prayerHi,
-              locationLabel: settings.locationLabel,
-              lang,
-            });
+            const title =
+              lang === 'hi' ? `${prayerHi} की नमाज़ का वक़्त` : `${prayerEn} Prayer Time`;
+            const body =
+              lang === 'hi'
+                ? `${settings.locationLabel} में ${prayerHi} का समय शुरू हो गया (${w.startFormatted} – ${w.endFormatted})।`
+                : `${prayerEn} time has started (${w.startFormatted} – ${w.endFormatted}) in ${settings.locationLabel}.`;
+
+            if (settings.soundEnabled) {
+              playPrayerAlarmAudio(settings.alarmVoice, {
+                prayerLabel: prayerEn,
+                prayerLabelHi: prayerHi,
+                locationLabel: settings.locationLabel,
+                lang,
+              });
+            }
+            const pushed = await showBrowserOrSwNotification(title, body, `start-${w.id}-${dateKey}`);
+            if (!pushed || onInAppAlert) {
+              onInAppAlert?.(
+                `${title}: ${w.startFormatted} – ${w.endFormatted} (${settings.locationLabel})`
+              );
+            }
           }
-          const pushed = await showBrowserOrSwNotification(title, body);
-          if (!pushed || onInAppAlert) {
-            onInAppAlert?.(`${title}: ${w.startFormatted} – ${w.endFormatted} (${settings.locationLabel})`);
+        }
+
+        // 2. 30-minute before-end warning (Isha fixed at 9:30 PM = 30 min before 10:00 PM)
+        if (settings.beforeEndReminderEnabled) {
+          const warnDateKey = getLocalDateKey(w.closingAlertAt);
+          const warnDiffMs = nowMs - w.closingAlertAt.getTime();
+          if (
+            warnDiffMs >= 0 &&
+            warnDiffMs <= 120_000 &&
+            !wasFired(END_WARN_PREFIX, warnDateKey, w.id)
+          ) {
+            markFired(END_WARN_PREFIX, warnDateKey, w.id);
+
+            const title =
+              w.id === 'isha'
+                ? lang === 'hi'
+                  ? `इशा का वक़्त (9:30 PM रिमाइंडर)`
+                  : `Isha Reminder (9:30 PM)`
+                : lang === 'hi'
+                  ? `${prayerHi} ख़त्म होने में 30 मिनट बाक़ी`
+                  : `30 Min Left for ${prayerEn}`;
+
+            const body =
+              w.id === 'isha'
+                ? lang === 'hi'
+                  ? `रात 10:00 बजे से 30 मिनट पहले: कृपया इशा की नमाज़ अदा कर लें (${settings.locationLabel})।`
+                  : `30 minutes before 10:00 PM: Please offer your Isha prayer (${settings.locationLabel}).`
+                : lang === 'hi'
+                  ? `${settings.locationLabel} में ${prayerHi} का वक़्त ${w.endFormatted} पर ख़त्म होगा।`
+                  : `${prayerEn} prayer window ends in 30 minutes at ${w.endFormatted} (${settings.locationLabel}).`;
+
+            if (settings.soundEnabled) {
+              playPrayerAlarmAudio(settings.alarmVoice, {
+                prayerLabel: prayerEn,
+                prayerLabelHi: prayerHi,
+                locationLabel: settings.locationLabel,
+                lang,
+              });
+            }
+            const pushed = await showBrowserOrSwNotification(
+              title,
+              body,
+              `endwarn-${w.id}-${warnDateKey}`
+            );
+            if (!pushed || onInAppAlert) {
+              onInAppAlert?.(`${title} — ${body}`);
+            }
           }
         }
       }
@@ -165,12 +224,12 @@ export function usePrayerAlarms(
           : 'QazaFlow Prayer Alarm Test';
     const body =
       lang === 'hi'
-        ? `${settings.locationLabel} में ${prayerHi} का वक़्त: ${target?.startFormatted || ''} – ${target?.endFormatted || ''}`
+        ? `${settings.locationLabel} में ${prayerHi} का वक़्त: ${target?.startFormatted || ''} – ${target?.endFormatted || ''} (समाप्ति अलर्ट: ${target?.closingAlertFormatted || ''})`
         : target
-          ? `${prayerEn} window for ${settings.locationLabel}: ${target.startFormatted} – ${target.endFormatted}.`
+          ? `${prayerEn} window (${settings.locationLabel}): ${target.startFormatted} – ${target.endFormatted}. 30m alert at ${target.closingAlertFormatted}.`
           : `Prayer alarms are active for ${settings.locationLabel}.`;
 
-    const sentSystem = await showBrowserOrSwNotification(title, body);
+    const sentSystem = await showBrowserOrSwNotification(title, body, 'qazaflow-alarm-test');
     onInAppAlert?.(
       sentSystem
         ? lang === 'hi'

@@ -463,6 +463,19 @@ export const PrayerTimesCard: React.FC = () => {
                     ({getEndHint(w.id, w.endHint)})
                   </span>
                 </p>
+                {prayerSettings.beforeEndReminderEnabled && (
+                  <p className="text-[11px] text-[#7A827D] font-mono-num mt-0.5">
+                    {w.id === 'isha'
+                      ? tr(
+                          `Ending alert: ${w.closingAlertFormatted} (30m before 10 PM)`,
+                          `अंतिम रिमाइंडर: ${w.closingAlertFormatted} (रात 10 से 30 मिनट पहले)`
+                        )
+                      : tr(
+                          `30m before end alert: ${w.closingAlertFormatted}`,
+                          `ख़त्म होने से 30 मिनट पहले अलर्ट: ${w.closingAlertFormatted}`
+                        )}
+                  </p>
+                )}
               </div>
 
               <button
@@ -491,18 +504,45 @@ export const PrayerTimesCard: React.FC = () => {
         </div>
       )}
 
-      {/* Alarm Voice Selector & Actions */}
+      {/* 30-Min Before-End Reminder Toggle & Alarm Sound Selector */}
       <div className="space-y-3 pt-1">
+        <label className="px-3.5 py-2.5 rounded-xl bg-[#F8F7F4] dark:bg-[#0E1311] border border-[#E5E2DC] dark:border-[#242E2A] flex items-center justify-between gap-3 cursor-pointer">
+          <div className="min-w-0">
+            <p className="text-xs font-medium text-[#1A1D1B] dark:text-[#F1F3F2]">
+              {tr(
+                '30-Min Before-End Alert (Isha at 9:30 PM)',
+                'वक़्त ख़त्म होने से 30 मिनट पहले अलर्ट (इशा 9:30 PM)'
+              )}
+            </p>
+            <p className="text-[11px] text-[#5C635E] dark:text-[#9AA59E]">
+              {tr(
+                'Notifies 30 mins before Fajr–Maghrib end, and at 9:30 PM (30m before 10 PM) for Isha.',
+                'फ़ज्र–मग़रिब ख़त्म होने से 30 मिनट पहले और इशा के लिए रात 9:30 बजे अलर्ट भेजता है।'
+              )}
+            </p>
+          </div>
+          <input
+            type="checkbox"
+            checked={prayerSettings.beforeEndReminderEnabled}
+            onChange={(e) => {
+              const checked = e.target.checked;
+              if (checked) void requestNotificationsIfNeeded();
+              updatePrayerSettings({ beforeEndReminderEnabled: checked });
+            }}
+            className="w-4 h-4 accent-[#1B4D3E] shrink-0"
+          />
+        </label>
+
         <div className="space-y-1.5">
           <label
             htmlFor="alarm-voice-select"
             className="block text-[11px] font-medium text-[#5C635E] dark:text-[#9AA59E]"
           >
-            {tr('Alarm Voice & Chime Style', 'अलार्म की आवाज़ और धुन')}
+            {tr('Alarm Sound / Tone Style', 'अलार्म की आवाज़ / रिंगटोन चुनें')}
           </label>
           <select
             id="alarm-voice-select"
-            value={prayerSettings.alarmVoice || 'adhan_voice'}
+            value={prayerSettings.alarmVoice || 'loud_digital_beep'}
             onChange={(e) =>
               updatePrayerSettings({
                 alarmVoice: e.target.value as AlarmVoiceType,
@@ -511,11 +551,20 @@ export const PrayerTimesCard: React.FC = () => {
             }
             className="w-full min-h-[40px] px-3 rounded-xl border border-[#E5E2DC] dark:border-[#242E2A] bg-[#F8F7F4] dark:bg-[#0E1311] text-xs font-medium"
           >
-            {ALARM_VOICE_OPTIONS.map((opt) => (
-              <option key={opt.id} value={opt.id}>
-                {lang === 'hi' ? opt.labelHi : opt.labelEn}
-              </option>
-            ))}
+            <optgroup label={tr('Loud Alarms (No Voice, No Music)', 'तेज़ अलार्म (बिना आवाज़ और बिना संगीत)')}>
+              {ALARM_VOICE_OPTIONS.filter((opt) => opt.group === 'loud').map((opt) => (
+                <option key={opt.id} value={opt.id}>
+                  {lang === 'hi' ? opt.labelHi : opt.labelEn}
+                </option>
+              ))}
+            </optgroup>
+            <optgroup label={tr('Chimes & Spoken Alerts', 'धुन और बोलकर अलार्म')}>
+              {ALARM_VOICE_OPTIONS.filter((opt) => opt.group === 'chime').map((opt) => (
+                <option key={opt.id} value={opt.id}>
+                  {lang === 'hi' ? opt.labelHi : opt.labelEn}
+                </option>
+              ))}
+            </optgroup>
           </select>
         </div>
 
